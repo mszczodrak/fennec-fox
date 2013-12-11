@@ -28,7 +28,7 @@
 #include <Fennec.h>
 
 configuration nullNetC {
-provides interface Mgmt;
+provides interface SplitControl;
 provides interface AMSend as NetworkAMSend;
 provides interface Receive as NetworkReceive;
 provides interface Receive as NetworkSnoop;
@@ -49,7 +49,7 @@ uses interface PacketAcknowledgements as MacPacketAcknowledgements;
 implementation {
 
 components nullNetP;
-Mgmt = nullNetP;
+SplitControl = nullNetP;
 nullNetParams = nullNetP;
 NetworkAMSend = nullNetP.NetworkAMSend;
 NetworkReceive = nullNetP.NetworkReceive;
