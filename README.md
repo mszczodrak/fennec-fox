@@ -12,3 +12,4 @@ echo "export FENNEC_FOX_LIB=`pwd`/src" >> ~/.profile
 
 echo "Please logout or at least enter 'source ~/.profile'"
 
+
