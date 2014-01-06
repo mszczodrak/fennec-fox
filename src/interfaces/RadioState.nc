@@ -32,40 +32,44 @@
  * Author: Miklos Maroti
  */
 
-interface RadioPacket
+//#include <Tasklet.h>	/* remove taskles - Marcin Szczodrak */
+
+interface RadioState
 {
 	/**
-	 * This command returns the length of the header. The header
-	 * starts at the first byte of the message_t structure 
-	 * (some layers may add dummy bytes to allign the payload to
-	 * the msg->data section).
+	 * Moves to radio into sleep state with the lowest power consumption but 
+	 * highest wakeup time. The radio cannot send or receive in this state 
+	 * and releases all access to shared resources (e.g. SPI bus). 
 	 */
-	async command uint8_t headerLength(message_t* msg);
+	command error_t turnOff();
 
 	/**
-	 * Returns the length of the payload. The payload starts right
-	 * after the header.
+	 * The same as the turnOff command, except it is not as deep sleep, and
+	 * it is quicker to recover from this state.
 	 */
-	async command uint8_t payloadLength(message_t* msg);
+	command error_t standby();
 
 	/**
-	 * Sets the length of the payload.
+	 * Goes into receive state. The radio continuously receive messages 
+	 * and able to transmit.
 	 */
-	async command void setPayloadLength(message_t* msg, uint8_t length);
+	command error_t turnOn();
 
 	/**
-	 * Returns the maximum length that can be set for this message.
+	 * Sets the current channel. Returns EBUSY if the stack is unable
+	 * to change the channel this time (some other operation is in progress)
+	 * SUCCESS otherwise.
 	 */
-	async command uint8_t maxPayloadLength();
+	command error_t setChannel(uint8_t channel);
 
 	/**
-	 * Returns the length of the metadata section. The metadata section
-	 * is at the very end of the message_t structure and grows downwards.
+	 * This event is signaled exactly once for each sucessfully posted state 
+	 * transition and setChannel command when it is completed.
 	 */
-	async command uint8_t metadataLength(message_t* msg);
+	event void done();
 
 	/**
-	 * Clears all metadata and sets all default values in the headers.
+	 * Returns the currently selected channel.
 	 */
-	async command void clear(message_t* msg);
+	command uint8_t getChannel();
 }

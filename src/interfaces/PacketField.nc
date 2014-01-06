@@ -32,40 +32,27 @@
  * Author: Miklos Maroti
  */
 
-interface RadioPacket
+interface PacketField<value_type>
 {
 	/**
-	 * This command returns the length of the header. The header
-	 * starts at the first byte of the message_t structure 
-	 * (some layers may add dummy bytes to allign the payload to
-	 * the msg->data section).
+	 * Returns TRUE if the value is set for this message.
 	 */
-	async command uint8_t headerLength(message_t* msg);
+	async command bool isSet(message_t* msg);
 
 	/**
-	 * Returns the length of the payload. The payload starts right
-	 * after the header.
+	 * Returns the stored value of this field in the message. If the
+	 * value is not set, then the returned value is undefined.
 	 */
-	async command uint8_t payloadLength(message_t* msg);
+	async command value_type get(message_t* msg);
 
 	/**
-	 * Sets the length of the payload.
-	 */
-	async command void setPayloadLength(message_t* msg, uint8_t length);
-
-	/**
-	 * Returns the maximum length that can be set for this message.
-	 */
-	async command uint8_t maxPayloadLength();
-
-	/**
-	 * Returns the length of the metadata section. The metadata section
-	 * is at the very end of the message_t structure and grows downwards.
-	 */
-	async command uint8_t metadataLength(message_t* msg);
-
-	/**
-	 * Clears all metadata and sets all default values in the headers.
+	 * Clears the isSet flag.
 	 */
 	async command void clear(message_t* msg);
+
+	/**
+	 * Sets the isSet false to TRUE and the time stamp value to the 
+	 * specified value.
+	 */
+	async command void set(message_t* msg, value_type value);
 }
