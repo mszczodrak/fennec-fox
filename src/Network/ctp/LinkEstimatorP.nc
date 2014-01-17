@@ -39,7 +39,7 @@
 
 #include "./LinkEstimator.h"
 
-module LinkEstimatorP {
+generic module LinkEstimatorP() {
   provides {
     interface StdControl;
     interface AMSend as Send;
@@ -54,9 +54,10 @@ module LinkEstimatorP {
     interface AMPacket as SubAMPacket;
     interface Packet as SubPacket;
     interface Receive as SubReceive;
-    interface LinkPacketMetadata;
     interface Random;
   }
+
+uses interface LinkPacketMetadata as MacLinkPacketMetadata;
 }
 
 implementation {
@@ -646,13 +647,7 @@ implementation {
 	       lets insert this link into the table.
 	    */
 
-
-
-            /* instead of calling LinkPacketMetadata.highChannelQuality(msg) 
-             * which does return call CC2420Packet.getLqi(msg) > 105
-             */
-
-            if (msg->lqi > 105) {
+            if (call MacLinkPacketMetadata.highChannelQuality(msg)) {
 	      if (signal CompareBit.shouldInsert(msg, 
 						 call Packet.getPayload(msg, call Packet.payloadLength(msg)),
 						 call Packet.payloadLength(msg))) {

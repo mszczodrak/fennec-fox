@@ -37,12 +37,46 @@
  * @author David Moss
  */
 
+/*
+ * Copyright (c) 2009, Columbia University.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *  - Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  - Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *  - Neither the name of the <organization> nor the
+ *    names of its contributors may be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/**
+  * CSMA MAC adaptation based on the TinyOS ActiveMessage stack for CC2420.
+  *
+  * @author: Marcin K Szczodrak
+  * @updated: 01/03/2014
+  */
+
+
 #include "Lpl.h"
 #include "DefaultLpl.h"
 #include "AM.h"
 
-module DefaultLplP {
-provides interface LowPowerListening;
+generic module DefaultLplP() {
 provides interface Send;
 provides interface Receive;
 provides interface SplitControl;
@@ -58,10 +92,14 @@ uses interface Timer<TMilli> as OnTimer;
 uses interface Timer<TMilli> as SendDoneTimer;
 uses interface Random;
 uses interface Leds;
-uses interface ReceiveIndicator as EnergyIndicator;
-uses interface ReceiveIndicator as ByteIndicator;
-uses interface ReceiveIndicator as PacketIndicator;
-uses interface csmacaMacParams;
+
+uses interface PacketField<uint8_t> as PacketTransmitPower;
+uses interface PacketField<uint8_t> as PacketRSSI;
+uses interface PacketField<uint32_t> as PacketTimeSync;
+uses interface PacketField<uint8_t> as PacketLinkQuality;
+
+uses interface RadioCCA;
+uses interface csmacaParams;
 }
 
 implementation {
@@ -86,18 +124,10 @@ task void resend();
 task void startRadio();
 task void stopRadio();
 
-task void detected();
-  
-void initializeSend();
 void startOffTimer();
-task void getCca();
-
 
 /** The current period of the duty cycle, equivalent of wakeup interval */
 uint16_t sleepInterval = LPL_DEF_LOCAL_WAKEUP;
-
-/** The number of times the CCA has been sampled in this wakeup period */
-uint16_t ccaChecks;
 
 bool finishSplitControlRequests();
 bool isDutyCycling();
@@ -116,10 +146,10 @@ command error_t SplitControl.start() {
 	// Radio was off, now has been told to turn on or duty cycle.
 	state = S_STARTING;
 
-	if (TOS_NODE_ID == call csmacaMacParams.get_sink_addr()) {
+	if (TOS_NODE_ID == call csmacaParams.get_sink_addr()) {
 		sleepInterval = 0;
 	} else {
-		sleepInterval = call csmacaMacParams.get_delay_after_receive();
+		sleepInterval = call csmacaParams.get_delay_after_receive();
 	}
 
 	if(sleepInterval > 0) {
@@ -154,14 +184,12 @@ event void OnTimer.fired() {
 			// Someone else turned on the radio, try again in awhile
 			call OnTimer.startOneShot(sleepInterval);
 		} else {
-			ccaChecks = 0;
 
 			/*
         		 * Turn on the radio only after the uC is fully awake.  ATmega128's
 	        	 * have this issue when running on an external crystal.
 	        	 */
-			post getCca();
-
+			post startRadio();
 		}
 	}
 }
@@ -169,8 +197,7 @@ event void OnTimer.fired() {
 
 /***************** Tasks ****************/
 task void stopRadio() {
-	error_t error = call SubControl.stop();
-	if(error != SUCCESS) {
+	if (call SubControl.stop() != SUCCESS) {
 		finishSplitControlRequests();
 		call OnTimer.startOneShot(sleepInterval);
 	}
@@ -182,42 +209,6 @@ task void startRadio() {
 	if ((startResult != SUCCESS && startResult != EALREADY)) {
                 post startRadio();
         }
-}
-
-
-task void getCca() {
-	uint8_t detects = 0;
-	if(isDutyCycling()) {
-
-		ccaChecks++;
-		if(ccaChecks == 1) {
-			// Microcontroller is ready, turn on the radio and sample a few times
-			post startRadio();
-			return;
-		}
-
-		atomic {
-			for( ; ccaChecks < MAX_LPL_CCA_CHECKS && call SendState.isIdle(); ccaChecks++) {
-				if(call PacketIndicator.isReceiving()) {
-					post detected();
-					return;
-				}
-	
-				if(call EnergyIndicator.isReceiving()) {
-					detects++;
-					if(detects > MIN_SAMPLES_BEFORE_DETECT) {
-						post detected();
-						return;
-					}
-					// Leave the radio on for upper layers to perform some transaction
-				}
-			}
-		}
-
-		if(call SendState.isIdle()) {
-			post stopRadio();
-		}
-	}
 }
 
 
@@ -249,62 +240,6 @@ bool finishSplitControlRequests() {
 }
 
 
-/***************** LowPowerListening Commands ***************/
-/**
- * Set this this node's radio wakeup interval, in milliseconds.
- * Once every interval, the node will sleep and perform an Rx check 
- * on the radio.  Setting the wakeup interval to 0 will keep the radio
- * always on.
- *
- * @param intervalMs the length of this node's wakeup interval, in [ms]
- */
-command void LowPowerListening.setLocalWakeupInterval(uint16_t sleepIntervalMs) {
-
-	if (!sleepInterval && sleepIntervalMs) {
-		// We were always on, now lets duty cycle
-		post stopRadio();  // Might want to delay turning off the radio
-	}
-
-	sleepInterval = sleepIntervalMs;
-
-	if(sleepInterval == 0 && (state == S_STARTED)) {
-		/*
-		* Leave the radio on permanently if sleepInterval == 0 and the radio is
-		* supposed to be enabled
-		*/
-		if(!radioPowerState) {
-			call SubControl.start();
-		}
-	}
-}
-  
-/**
- * @return the local node's wakeup interval, in [ms]
- */
-command uint16_t LowPowerListening.getLocalWakeupInterval() {
-	return sleepInterval;
-}
-  
-/**
- * Configure this outgoing message so it can be transmitted to a neighbor mote
- * with the specified wakeup interval.
- * @param msg Pointer to the message that will be sent
- * @param intervalMs The receiving node's wakeup interval, in [ms]
- */
-command void LowPowerListening.setRemoteWakeupInterval(message_t *msg, 
-	uint16_t intervalMs) {
-	metadata_t *metadata = (metadata_t*) msg->metadata;
-	metadata->rxInterval = intervalMs;
-}
-  
-/**
-  * @return the destination node's wakeup interval configured in this message
-  */
-command uint16_t LowPowerListening.getRemoteWakeupInterval(message_t *msg) {
-	metadata_t *metadata = (metadata_t*) msg->metadata;
-	return metadata->rxInterval;
-}
-  
 /***************** Send Commands ***************/
 /**
  * Each call to this send command gives the message a single
@@ -330,7 +265,7 @@ command error_t Send.send(message_t *msg, uint8_t len) {
 		call SendDoneTimer.stop();
       
 		if(radioPowerState) {
-			initializeSend();
+			post send();
 			return SUCCESS;
 		} else {
 			post startRadio();
@@ -358,22 +293,24 @@ command uint8_t Send.maxPayloadLength() {
 command void *Send.getPayload(message_t* msg, uint8_t len) {
 	return call SubSend.getPayload(msg, len);
 }
-  
-  
-/***************** DutyCycle Events ***************/
-/**
-  * A transmitter was detected.  You must now take action to
-  * turn the radio off when the transaction is complete.
-  */
-task void detected() {
-	// At this point, the duty cycling has been disabled temporary
-	// and it will be this component's job to turn the radio back off
-	// Wait long enough to see if we actually receive a packet, which is
-	// just a little longer in case there is more than one lpl transmitter on
-	// the channel.
-	startOffTimer();
+ 
+
+task void check() {
+
+	uint16_t i = 0;
+
+	for( ; i < MAX_LPL_CCA_CHECKS && call SendState.isIdle(); i++) {
+		if(call RadioCCA.request() == EBUSY) {
+			startOffTimer();
+			return;
+		}
+	}
+	
+	if(call SendState.isIdle()) {
+		post stopRadio();
+	}
 }
-  
+ 
   
 /***************** SubControl Events ***************/
 event void SubControl.startDone(error_t error) {
@@ -384,13 +321,12 @@ event void SubControl.startDone(error_t error) {
 		if(finishSplitControlRequests()) {
 
 		} else if(isDutyCycling()) {
-			post getCca();
+			post check();
 		}
-
     
 		if(call SendState.getState() == S_LPL_FIRST_MESSAGE
 			|| call SendState.getState() == S_LPL_SENDING) {
-			initializeSend();
+			post send();
 		}
 	}
 }
@@ -492,7 +428,6 @@ event void SendDoneTimer.fired() {
 	}
 }
   
-  
 /***************** Tasks ***************/
 task void send() {
 	if(call SubSend.send(currentSendMsg, currentSendLen) != SUCCESS) {
@@ -506,26 +441,15 @@ task void resend() {
 	}
 }
   
-/***************** Functions ***************/
-void initializeSend() {
-	if(call LowPowerListening.getRemoteWakeupInterval(currentSendMsg) > 0) {
-		csmaca_header_t* header = (csmaca_header_t*)call SubSend.getPayload(currentSendMsg, sizeof(csmaca_header_t)); 
-		if(header->dest == IEEE154_BROADCAST_ADDR) {
-			call PacketAcknowledgements.noAck(currentSendMsg);
-		} else {
-			// Send it repetitively within our transmit window
-			call PacketAcknowledgements.requestAck(currentSendMsg);
-		}
-
-		call SendDoneTimer.startOneShot(
-		call LowPowerListening.getRemoteWakeupInterval(currentSendMsg) + 20);
-	}
-	post send();
-}
   
   
 void startOffTimer() {
-	call OffTimer.startOneShot(call csmacaMacParams.get_delay_after_receive());
+	call OffTimer.startOneShot(call csmacaParams.get_delay_after_receive());
+}
+
+
+async event void RadioCCA.done(error_t err) {
+
 }
 
 }

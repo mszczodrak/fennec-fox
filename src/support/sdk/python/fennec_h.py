@@ -72,6 +72,11 @@ S_LOAD			= 29
 S_RECONFIGURING         = 30
 S_RECONF_ENABLED        = 31
 S_COMPLETED             = 32
+S_BUSY			= 33
+S_SERIAL		= 34
+S_NEW_STATE		= 35
+S_RESET			= 36
+S_ERROR			= 37
 
 
 #                /* tx */
@@ -91,12 +96,12 @@ PANIC_WARNING           = 2
 
 
 #                /* Fennec System Flags */
-F_RADIO			= 1
-F_ADDRESSING		= 2
+F_APPLICATION           = 1
+F_NETWORK               = 2
 F_MAC   		= 3
-F_QOI     		= 4
-F_NETWORK               = 5
-F_APPLICATION           = 6
+F_RADIO			= 4
+F_ADDRESSING		= 5
+F_QOI     		= 6
 F_EVENTS                = 7
 F_MAC_ADDRESSING        = 8
 F_NETWORK_ADDRESSING    = 9
@@ -112,6 +117,8 @@ F_BRIDGE                = 21
 F_BASE_STATION          = 22
 F_SYSTEM                = 23
 F_MEMORY                = 24
+
+F_LAYERS		= 4
 
 FENNEC_SYSTEM_FLAGS_NUM = 30
 POLICY_CONFIGURATION    = 250
