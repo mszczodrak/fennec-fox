@@ -59,12 +59,12 @@ message_t packet;
 bool busy;
 
 task void reset_led_timer() {
-	call LedTimer.startOneShot(2 * call RssiParams.get_delay());
+	call LedTimer.startOneShot(2 * call RssiParams.get_tx_delay());
 }
 
 command error_t SplitControl.start() {
 	dbg("Application", "Rssi SplitControl.start()");
-	call SendTimer.startPeriodic(call RssiParams.get_delay());
+	call SendTimer.startPeriodic(call RssiParams.get_tx_delay());
 	busy = FALSE;
 	post reset_led_timer();
 	signal SplitControl.startDone(SUCCESS);
@@ -82,12 +82,8 @@ event void NetworkAMSend.sendDone(message_t *msg, error_t error) {
 }
 
 event message_t* NetworkReceive.receive(message_t *msg, void* payload, uint8_t len) {
-	int8_t rssi = (int8_t) getMetadata(msg)->rssi;
-	rssi -= 45;	/* cc2420 spec */
-
 #ifdef FENNEC_TOS_PRINTF
-	printf("%u %u %u\n", getMetadata(msg)->rssi, getMetadata(msg)->lqi, getMetadata(msg)->crc);
-	printf("%d\n", rssi);
+	printf("%d %u %u\n", (int8_t)getMetadata(msg)->rssi, getMetadata(msg)->lqi, getMetadata(msg)->crc);
 	printfflush();
 #endif
 
@@ -95,11 +91,11 @@ event message_t* NetworkReceive.receive(message_t *msg, void* payload, uint8_t l
 
 	call Leds.led0On();
 
-	if (rssi > -90 ) {
+	if ( ((int8_t)getMetadata(msg)->rssi) > call RssiParams.get_threshold_1() ) {
 		call Leds.led1On();
 	}
 
-	if (rssi > -60 ) {
+	if ( ((int8_t)getMetadata(msg)->rssi) > call RssiParams.get_threshold_2() ) {
 		call Leds.led2On();
 	}
 
