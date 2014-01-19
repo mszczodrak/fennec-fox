@@ -1,4 +1,4 @@
-PFLAGS+=-I$(FENNEC_FOX_LIB)/Application/tests/Rssi
+PFLAGS+=-I$(FENNEC_FOX_LIB)/Application/tests/Blink
 PFLAGS+=-I$(FENNEC_FOX_LIB)/Network/nullNet
 PFLAGS+=-I$(FENNEC_FOX_LIB)/Mac/nullMac
-PFLAGS+=-I$(FENNEC_FOX_LIB)/Radio/cc2420
+PFLAGS+=-I$(FENNEC_FOX_LIB)/Radio/nullRadio
