@@ -46,7 +46,6 @@
 #include <memory.h>
 #include <tos.h>
 #include <radio.h>
-//#include <seh.h>
 #include <hashtable.h>
 #include <SerialPacket.h>
 #include <sim_serial_packet.h>
@@ -84,8 +83,6 @@ class Variable {
   variable_string_t str;
 };
 
-class Callback;
-
 class Mote {
  public:
   Mote(nesc_app_t* app);
@@ -108,18 +105,12 @@ class Mote {
   void createNoiseModel();
   int generateNoise(int when);
 
-//  void addIrradianceTraceReading(double val);
-
-//  int addReadIO(int io_size, int (*op) (int, int));
-//  int addWriteIO(int io_size, int (*op) (int, int, int));
-
-  void setCallback(Callback &callback);
-  void call();
+  void writeInput(double val, int input_id, long long int time_val);
+  double readOutput(int input_id, long long int time_val);
   
   Variable* getVariable(char* name);
   
  private:
-  Callback* callback_;
   unsigned long nodeID;
   nesc_app_t* app;
   struct hashtable* varTable;
@@ -148,8 +139,6 @@ class Tossim {
   bool runNextEvent();
 
   Radio* radio();
-
-//  SEH* seh();
 
   SerialPacket* newSerialPacket();
 

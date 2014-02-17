@@ -8,11 +8,12 @@ extern "C" {
 #endif
 
 void sim_io_init();
-int sim_read_io(uint16_t node_id);
-int sim_write_io(uint16_t node_id, uint32_t val);
 
-int sim_add_read_io(uint16_t node_id, uint8_t size, int (*op) (int, int));
-int sim_add_write_io(uint16_t node_id, uint8_t size, int (*op) (int, int, int));
+double sim_outside_read_output(uint16_t node_id, int input_id, long long int time_val);
+void sim_outside_write_input(uint16_t node_id, double data_val, int input_id, long long int time_val);
+
+double sim_node_read_input(uint16_t node_id, int input_id);
+void sim_node_write_output(uint16_t node_id, double val, int input_id);
 
 #ifdef __cplusplus
 }

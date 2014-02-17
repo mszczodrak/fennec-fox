@@ -105,7 +105,6 @@ struct @exactlyonce { };
 
 #include <sim_radio.c>
 #include <sim_gain.c>
-//#include <sim_seh.c>
 
 #include <randomlib.c>
 #include <sim_noise.c>
