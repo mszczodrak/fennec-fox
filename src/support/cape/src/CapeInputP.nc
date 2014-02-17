@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Columbia University.
+ * Copyright (c) 2014, Columbia University.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,42 +26,45 @@
  */
 
 /**
-  * Phidget ADC sensor driver
+  * Fennec Fox Cape Read Input
   *
   * @author: Marcin K Szczodrak
-  * @updated: 01/08/2014
+  * @last_update: 02/10/2014
   */
 
-#include <Fennec.h>
-#include "phidget_adc_driver.h"
 
-generic configuration phidget_adc_driverC() {
-provides interface SensorCtrl;
-provides interface AdcSetup;
-provides interface SensorInfo;
-provides interface Read<ff_sensor_data_t>;
+module CapeInputP {
+provides interface Read<uint16_t> as Read16[uint8_t id];
+provides interface Read<uint32_t> as Read32[uint8_t id];
 }
 
 implementation {
 
-components new phidget_adc_driverP();
-SensorCtrl = phidget_adc_driverP.SensorCtrl;
-SensorInfo = phidget_adc_driverP.SensorInfo;
-AdcSetup = phidget_adc_driverP.AdcSetup;
-Read = phidget_adc_driverP.Read;
+norace uint8_t reader_id;
 
-components new Msp430Adc12ClientC();
-phidget_adc_driverP.Msp430Adc12SingleChannel -> Msp430Adc12ClientC;
-phidget_adc_driverP.Resource -> Msp430Adc12ClientC;
-
-components new BatteryC();
-phidget_adc_driverP.Battery -> BatteryC.Read;
-
-components new TimerMilliC() as Timer;
-phidget_adc_driverP.Timer -> Timer;
-
-components LedsC;
-phidget_adc_driverP.Leds -> LedsC;
-
+task void do_read16() {
+	signal Read16.readDone[reader_id](SUCCESS, TOS_NODE_ID);
 }
 
+task void do_read32() {
+	signal Read32.readDone[reader_id](SUCCESS, TOS_NODE_ID);
+}
+
+command error_t Read16.read[uint8_t id]() {
+	dbg("CapeInput", "CapeInput Read16.read[%u]()", id);
+	reader_id = id;	
+	post do_read16();
+	return SUCCESS;
+}
+
+command error_t Read32.read[uint8_t id]() {
+	dbg("CapeInput", "CapeInput Read32.read[%u]()", id);
+	reader_id = id;	
+	post do_read32();
+	return SUCCESS;
+}
+
+default void event Read16.readDone[uint8_t id](error_t error, uint16_t val) {}
+default void event Read32.readDone[uint8_t id](error_t error, uint32_t val) {}
+
+}

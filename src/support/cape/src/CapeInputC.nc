@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Columbia University.
+ * Copyright (c) 2014, Columbia University.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,42 +26,34 @@
  */
 
 /**
-  * Phidget ADC sensor driver
+  * Fennec Fox Cape Read Input
   *
   * @author: Marcin K Szczodrak
-  * @updated: 01/08/2014
+  * @last_update: 02/10/2014
   */
 
-#include <Fennec.h>
-#include "phidget_adc_driver.h"
+#include "CapeInput.h"
 
-generic configuration phidget_adc_driverC() {
-provides interface SensorCtrl;
-provides interface AdcSetup;
-provides interface SensorInfo;
-provides interface Read<ff_sensor_data_t>;
+generic configuration CapeInputC() {
+
+provides interface Resource;
+provides interface Read<uint16_t> as Read16;
+provides interface Read<uint32_t> as Read32;
+
 }
 
 implementation {
 
-components new phidget_adc_driverP();
-SensorCtrl = phidget_adc_driverP.SensorCtrl;
-SensorInfo = phidget_adc_driverP.SensorInfo;
-AdcSetup = phidget_adc_driverP.AdcSetup;
-Read = phidget_adc_driverP.Read;
+enum {
+	CAPE_INPUT_ID = unique(CAPE_INPUT_RESOURCE),
+};
 
-components new Msp430Adc12ClientC();
-phidget_adc_driverP.Msp430Adc12SingleChannel -> Msp430Adc12ClientC;
-phidget_adc_driverP.Resource -> Msp430Adc12ClientC;
+components CapeInputP;
+Read16 = CapeInputP.Read16[CAPE_INPUT_ID];
+Read32 = CapeInputP.Read32[CAPE_INPUT_ID];
 
-components new BatteryC();
-phidget_adc_driverP.Battery -> BatteryC.Read;
-
-components new TimerMilliC() as Timer;
-phidget_adc_driverP.Timer -> Timer;
-
-components LedsC;
-phidget_adc_driverP.Leds -> LedsC;
+components new SimpleRoundRobinArbiterC(CAPE_INPUT_RESOURCE) as Arbiter;
+Resource = Arbiter.Resource[CAPE_INPUT_ID];
 
 }
 

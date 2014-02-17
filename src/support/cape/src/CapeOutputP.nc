@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Columbia University.
+ * Copyright (c) 2014, Columbia University.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,42 +26,45 @@
  */
 
 /**
-  * Phidget ADC sensor driver
+  * Fennec Fox Cape Write Output
   *
   * @author: Marcin K Szczodrak
-  * @updated: 01/08/2014
+  * @last_update: 02/10/2014
   */
 
-#include <Fennec.h>
-#include "phidget_adc_driver.h"
 
-generic configuration phidget_adc_driverC() {
-provides interface SensorCtrl;
-provides interface AdcSetup;
-provides interface SensorInfo;
-provides interface Read<ff_sensor_data_t>;
+module CapeOutputP {
+provides interface Write<uint16_t> as Write16[uint8_t id];
+provides interface Write<uint32_t> as Write32[uint8_t id];
 }
 
 implementation {
 
-components new phidget_adc_driverP();
-SensorCtrl = phidget_adc_driverP.SensorCtrl;
-SensorInfo = phidget_adc_driverP.SensorInfo;
-AdcSetup = phidget_adc_driverP.AdcSetup;
-Read = phidget_adc_driverP.Read;
+norace uint8_t writer_id;
 
-components new Msp430Adc12ClientC();
-phidget_adc_driverP.Msp430Adc12SingleChannel -> Msp430Adc12ClientC;
-phidget_adc_driverP.Resource -> Msp430Adc12ClientC;
-
-components new BatteryC();
-phidget_adc_driverP.Battery -> BatteryC.Read;
-
-components new TimerMilliC() as Timer;
-phidget_adc_driverP.Timer -> Timer;
-
-components LedsC;
-phidget_adc_driverP.Leds -> LedsC;
-
+task void do_write16() {
+	signal Write16.writeDone[writer_id](SUCCESS);
 }
 
+task void do_write32() {
+	signal Write32.writeDone[writer_id](SUCCESS);
+}
+
+command error_t Write16.write[uint8_t id](uint16_t val) {
+	dbg("CapeOutput", "CapeOutput Write16.read[%u](%u)", id, val);
+	writer_id = id;	
+	post do_write16();
+	return SUCCESS;
+}
+
+command error_t Write32.read[uint8_t id](uint32_t val) {
+	dbg("CapeOutput", "CapeOutput Write32.read[%u](%u)", id, val);
+	writer_id = id;	
+	post do_write32();
+	return SUCCESS;
+}
+
+default void event Write16.readDone[uint8_t id](error_t error) {}
+default void event Write32.readDone[uint8_t id](error_t error) {}
+
+}
