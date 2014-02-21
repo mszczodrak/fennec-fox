@@ -30,32 +30,36 @@
  */
 
 /**
- * Implementation Input/Output (Sensor/Actuator) channels
+ * Implementation of remote sensor data feeding
  *
  * @author Marcin Szczodrak
- * @last_updated   February 16 2014
+ * @last_updated   February 19 2014
  */
 
-#ifndef SIM_IO_H
-#define SIM_IO_H
+#include "SensorInput.h"
+#include "sim_sensor_input.h"
 
-#include <stdio.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-void sim_io_init();
-
-uint32_t sim_outside_read_output(uint16_t node_id, uint8_t input_id, long long int time_val);
-void sim_outside_write_input(uint16_t node_id, uint32_t data_val, uint8_t input_id, long long int time_val);
-
-uint32_t sim_node_read_input(uint16_t node_id, uint8_t input_id);
-void sim_node_write_output(uint16_t node_id, uint32_t val, uint8_t input_id);
-
-#ifdef __cplusplus
+SensorInput::SensorInput(const int port)
+{
+	openServerSocket(port);
 }
-#endif
 
+SensorInput::~SensorInput()
+{
+}
 
-#endif // SIM_IO_H
+void SensorInput::openServerSocket(const int port)
+{
+	sim_sensor_open_socket(port);
+}
+
+void SensorInput::forwardPacket(const void *packet, const int len)
+{
+	sim_sensor_forward_packet(packet, len);
+}
+
+void SensorInput::process()
+{
+	sim_sensor_process();
+}
+

@@ -32,6 +32,7 @@
   * @last_update: 02/10/2014
   */
 
+#include "sim_io.h"
 
 module CapeOutputP {
 provides interface Write<uint16_t> as Write16[uint8_t id];
@@ -41,30 +42,36 @@ provides interface Write<uint32_t> as Write32[uint8_t id];
 implementation {
 
 norace uint8_t writer_id;
+norace uint16_t write16;
+norace uint32_t write32;
 
 task void do_write16() {
+	sim_node_write_output(sim_node(), write16, writer_id);
 	signal Write16.writeDone[writer_id](SUCCESS);
 }
 
 task void do_write32() {
+	sim_node_write_output(sim_node(), write32, writer_id);
 	signal Write32.writeDone[writer_id](SUCCESS);
 }
 
 command error_t Write16.write[uint8_t id](uint16_t val) {
 	dbg("CapeOutput", "CapeOutput Write16.read[%u](%u)", id, val);
 	writer_id = id;	
+	write16 = val;
 	post do_write16();
 	return SUCCESS;
 }
 
-command error_t Write32.read[uint8_t id](uint32_t val) {
+command error_t Write32.write[uint8_t id](uint32_t val) {
 	dbg("CapeOutput", "CapeOutput Write32.read[%u](%u)", id, val);
 	writer_id = id;	
+	write32 = val;
 	post do_write32();
 	return SUCCESS;
 }
 
-default void event Write16.readDone[uint8_t id](error_t error) {}
-default void event Write32.readDone[uint8_t id](error_t error) {}
+default void event Write16.writeDone[uint8_t id](error_t error) {}
+default void event Write32.writeDone[uint8_t id](error_t error) {}
 
 }

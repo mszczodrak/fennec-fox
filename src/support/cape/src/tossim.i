@@ -239,6 +239,7 @@ PyObject* listFromArray(char* type, char* ptr, int len) {
 %include radio.i
 %include SerialPacket.i
 %include SerialForwarder.i
+%include SensorInput.i
 %include Throttle.i
 
 #ifdef SWIGPYTHON
