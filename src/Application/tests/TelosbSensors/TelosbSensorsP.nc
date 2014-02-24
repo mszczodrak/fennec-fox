@@ -87,6 +87,7 @@ task void report_measurements() {
 
 	if (call NetworkAMSend.send(dest, &network_packet,
 			sizeof(telosb_sensors_t)) != SUCCESS) {
+		call Leds.led0On();
 		signal NetworkAMSend.sendDone(&network_packet, FAIL);
 	}
 }
