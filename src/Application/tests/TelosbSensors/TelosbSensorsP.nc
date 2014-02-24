@@ -106,6 +106,8 @@ command error_t SplitControl.start() {
 	data->seq = 0;
 	data->src = TOS_NODE_ID;
 
+	call SerialSplitControl.start();
+
 	serial_data = (void*) call SerialAMSend.getPayload(&serial_packet,
 							sizeof(telosb_sensors_t));
 	if (call TelosbSensorsParams.get_dest()) {
