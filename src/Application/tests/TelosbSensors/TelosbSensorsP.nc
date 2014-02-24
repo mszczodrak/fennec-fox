@@ -93,8 +93,10 @@ task void report_measurements() {
 }
 
 task void send_serial_message() {
+	call Leds.led2Toggle();
 	if (call SerialAMSend.send(BROADCAST, &serial_packet, sizeof(telosb_sensors_t)) != SUCCESS) {
 		signal SerialAMSend.sendDone(&serial_packet, FAIL);
+		call Leds.led0On();
 	}
 }
 
