@@ -59,10 +59,6 @@ class Cape():
 			os.mkdir("./results")
 
 		self.__tossim = Tossim([])
-		if (self.__real_time):
-			self.__sf = SerialForwarder(9002)
-			self.__throttle = Throttle(self.__tossim, 10)	
-			self.__sin = SensorInput(9003)
 		self.__radio = self.__tossim.radio()
 		self.__topology_file = topology
 		self.__output_file = ""
@@ -85,6 +81,14 @@ class Cape():
 
 	def setNoiseFile(self, noise):
 		self.__noise_file = noise
+
+
+	def setSerialPort(self, port):
+		self.__sf_port = int(port)
+
+
+	def setSensorPort(self, port):
+		self.__sensor_port = int(port)
 
 
 	def setRealTime(self):
