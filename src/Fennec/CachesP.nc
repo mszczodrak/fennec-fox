@@ -38,8 +38,10 @@
 module CachesP @safe() {
 provides interface Fennec;
 provides interface SimpleStart;
-provides interface FennecWarnings;
+provides interface FennecState;
 uses interface SplitControl;
+
+uses interface Random;
 }
 
 implementation {
@@ -58,8 +60,8 @@ task void check_event() {
 	dbg("Caches", "CachesP check_event() current mask %d", event_mask);
 	for( i=0; i < NUMBER_OF_POLICIES; i++ ) {
 		if ((policies[i].src_conf == call Fennec.getStateId()) && (policies[i].event_mask == event_mask)) {
-			signal FennecWarnings.settingStateAndSeq();
 			call Fennec.setStateAndSeq(policies[i].dst_conf, current_seq + 1);
+			signal FennecState.resend();
 			return;
 		}
 	}
@@ -83,8 +85,6 @@ task void stop_done() {
 task void start_done() {
 	state_transitioning = FALSE;
 }
-
-
 
 uint16_t get_conf_id_in_state(module_t module_id) {
 	uint8_t i;
@@ -160,22 +160,37 @@ command struct state* Fennec.getStateRecord() {
 	return &states[call Fennec.getStateId()];
 }
 
-command error_t Fennec.setStateAndSeq(state_t state_id, uint16_t seq) {
-	dbg("Caches", "CachesP Fennec.setStateAndSeq(%d, %d)", state_id, seq);
+command error_t Fennec.setStateAndSeq(state_t new_state, uint16_t new_seq) {
+	dbg("Caches", "CachesP Fennec.setStateAndSeq(%d, %d)", new_state, new_seq);
 	/* check if there is ongoing reconfiguration */
 	if (state_transitioning) {
-		dbg("Caches", "CachesP Fennec.setStateAndSeq(%d, %d) - EBUSY", state_id, seq);
+		dbg("Caches", "CachesP Fennec.setStateAndSeq(%d, %d) - EBUSY", new_state, new_seq);
 		return EBUSY;	
 	}
-	/* check if this is only sequence change */
-	if (state_id == call Fennec.getStateId()) {
-		current_seq = seq;
+
+	if (new_seq < current_seq) {
+		signal FennecState.resend();
 		return SUCCESS;
 	}
-	next_state = state_id;
-	next_seq = seq;
-	state_transitioning = TRUE;
-	post stop_state();
+
+	if (new_seq > current_seq) {
+		if (new_state == current_state) {
+			current_seq = new_seq;
+			signal FennecState.resend();
+		} else {
+			next_state = new_state;
+			next_seq = new_seq;
+			state_transitioning = TRUE;
+			post stop_state();
+		}
+		return SUCCESS;
+	}
+
+	if ((new_state != current_state) && (new_seq == current_seq)) {
+		current_seq += (call Random.rand16() % SEQ_RAND) + SEQ_OFFSET;
+		signal FennecState.resend();
+	}
+
 	return SUCCESS;
 }
 
@@ -251,15 +266,13 @@ async command module_t Fennec.getNextModuleId(module_t from_module_id, uint8_t t
 async command error_t Fennec.checkPacket(message_t *msg) {
 	if (msg->conf >= NUMBER_OF_CONFIGURATIONS) {
 		dbg("Caches", "CachesP Fennec.checPacket(0x%1x) - FAIL", msg);
-		signal FennecWarnings.detectWrongConfiguration();
+		signal FennecState.resend();
 		return FAIL;
 	} 
 	return SUCCESS;
 }
 
-default async event void FennecWarnings.detectWrongConfiguration() {}
-
-default async event void FennecWarnings.settingStateAndSeq() {}
+default async event void FennecState.resend() {}
 
 }
 
