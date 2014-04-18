@@ -37,13 +37,16 @@
 #define FF_FUNCTIONS_H
 
 #include <Fennec.h>
+#include "ff_structs.h"
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 
+/*
 metadata_t* getMetadata( message_t* msg ) @C() {
         return (metadata_t*)msg->metadata;
 }
+*/
 
 uint32_t gcdr (uint32_t a, uint32_t b )@C() {
         if ( a==0 ) return b;
@@ -51,7 +54,10 @@ uint32_t gcdr (uint32_t a, uint32_t b )@C() {
 }
 
 /* Debugging functions */
-bool dbgs(uint8_t layer, uint8_t state, uint16_t action, uint16_t d0, uint16_t d1);
+bool dbgs(process_t process, uint8_t layer, uint8_t state, uint16_t action,
+					uint16_t d0, uint16_t d1, uint16_t);
+
+bool validProcessId(process_t process_id);
 
 #ifdef FENNEC_LOGGER
 void insertLog(uint16_t from, uint16_t message);

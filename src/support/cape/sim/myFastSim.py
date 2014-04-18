@@ -41,10 +41,15 @@ import sys
 class Simulator():
 	def __init__(self):
 		self.cape = Cape.Cape()
-		self.dbg_channels = ["Application", "Network"]
-		self.cape.setTopologyFile("topos/81/linkgain.out")
+		#self.dbg_channels = ["Application", "Network"]
+		self.dbg_channels = ["Application", "Network", "Mac", "Radio", "Fennec", "FennecEngine", "NetworkState", "NetworkProcess", "StateSynchronization", "Mac-Detail", "Radio-Detail"]
+		#self.dbg_channels = ["Application", "Radio", "Fennec", "NetworkState", "StateSynchronization"]
+		#self.dbg_channels = ["Application", "Fennec", "NetworkState", "StateSynchronization"]
+		#self.dbg_channels = ["Application", "Network", "Mac", "Radio", "Fennec", "StateSynchronization"]
+		#self.cape.setTopologyFile("topos/81/linkgain.out")
+		self.cape.setTopologyFile("topos/4/linkgain.out")
 		self.cape.setNoiseFile("noise/casino.txt")
-		self.cape.setSimulationTime(200)
+		self.cape.setSimulationTime(1000)
 		
 		self.cape.setup()
 		

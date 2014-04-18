@@ -39,8 +39,7 @@
 /* Fennec System Flags */
 #define F_APPLICATION           1
 #define F_NETWORK               2
-#define F_MAC                   3
-#define	F_RADIO                 4
+#define F_AM                    3
 #define F_ADDRESSING		5
 #define F_QOI                   6
 #define F_EVENTS                7
@@ -56,5 +55,12 @@
 #define F_NEW_ADDR		16
 
 #define F_LAYERS		4
+
+#define ACK_RECEIVED_FLAG	0
+#define TIME_STAMP_FLAG		1
+#define TRANSMIT_POWER_FLAG	2
+#define RSSI_FLAG		3
+#define TIME_SYNC_FLAG		4
+
 
 #endif

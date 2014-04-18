@@ -22,7 +22,11 @@ int destNode;
 sim_event_t sendEvent;
   
 message_t receiveBuffer;
-  
+
+tossim_metadata_t* getMetadata(message_t* msg) {
+	return (tossim_metadata_t*)(&msg->metadata);
+}
+
 task void startDoneTask() {
 	running = TRUE;
 	signal Control.startDone(SUCCESS);
@@ -49,7 +53,7 @@ command error_t Control.stop() {
 
 task void sendDoneTask() {
 	message_t* msg = sending;
-	metadata_t* meta = getMetadata(msg);
+	tossim_metadata_t* meta = getMetadata(msg);
 	meta->ack = 0;
 	meta->strength = 0;
 	meta->time = 0;
@@ -63,13 +67,15 @@ command error_t Packet.cancel(message_t* msg) {
 
 void start_radio();
 
-command error_t Packet.send(int dest, message_t* msg, uint8_t len) {
+async command error_t Packet.send(int dest, message_t* msg, uint8_t len) {
 	if (!running) {
+		dbg("Radio-Detail", "[-] cape CapePacketModel Packet.send - not running");
 		dbg("TossimPacketModelC", "TossimPacketModelC: Send.send() called, but not running!\n");
 		return EOFF;
 	}
 	dbg("TossimPacketModelC", "TossimPacketModelC packet.send");
 	if (sending != NULL) {
+		dbg("Radio-Detail", "[-] cape CapePacketModel Packet.send - BUSY");
 		return EBUSY;
 	}
 	sendingLength = len; 
@@ -102,7 +108,7 @@ void start_radio() {
 
 void send_transmit(sim_event_t* evt) {
 	sim_time_t duration;
-	metadata_t* metadata = getMetadata(sending);
+	tossim_metadata_t* metadata = getMetadata(sending);
 
 	duration = 8 * sendingLength;
 	duration /= sim_radio_bits_per_symbol();
@@ -144,7 +150,7 @@ uint8_t error = 0;
   
 event void GainRadioModel.acked(message_t* msg) {
 	if (running) {
-		metadata_t* metadata = getMetadata(sending);
+		tossim_metadata_t* metadata = getMetadata(sending);
 		metadata->ack = 1;
 		if (msg != sending) {
 			error = 1;
@@ -164,15 +170,17 @@ event bool GainRadioModel.shouldAck(message_t* msg) {
 }
 
 async command error_t RadioCCA.request() {
-        //if (call PacketIndicator.isReceiving()) {
-//                signal RadioCCA.done(EBUSY);
-//                return EBUSY;
-        //}
+	if (running == FALSE) {
+		signal RadioCCA.done(FAIL);
+		return FAIL;
+	}
 
 	if (call GainRadioModel.clearChannel()) {
 		signal RadioCCA.done(SUCCESS);
 		return SUCCESS;
 	}
+	
+	signal RadioCCA.done(EBUSY);
 	return EBUSY;
 }
 

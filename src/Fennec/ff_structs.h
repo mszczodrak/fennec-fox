@@ -37,105 +37,54 @@
 #define FF_STRUCTURES_H
 
 #include "ff_consts.h"
+#include "ff_structs.h"
+#include "platform_message.h"
 
-typedef uint16_t state_t;
-typedef uint16_t conf_t;
-typedef uint16_t module_t;
-typedef uint16_t layer_t;
-typedef uint16_t event_t;
-
-/*
-typedef nx_struct fennec_header_t {
-	nxle_uint8_t length;
-	nxle_uint16_t fcf;
-	nxle_uint8_t dsn;
-	nxle_uint16_t destpan;
-	nxle_uint16_t dest;
-	nxle_uint16_t src;
-} fennec_header_t;
-*/
-
-#include <Serial.h>
-
-typedef union message_header {
-//  cc2420_header_t cc2420;
-  serial_header_t serial;
-} message_header_t;
-
-
-struct state {
-        uint8_t 		state_id;
-        uint8_t 		num_confs;
-	conf_t *		conf_list;
-};
-
-
-typedef nx_struct metadata_t {
-	nx_uint8_t rssi;
-	nx_uint8_t lqi;
-	nx_uint8_t tx_power;
-#ifdef TOSSIM
-	nx_uint8_t crc;
-	nx_uint8_t ack;
-	nx_uint8_t strength;
-	nx_uint16_t time;
-	nx_uint8_t flags;
-#else
-	nx_uint8_t flags;
-	nx_bool crc;
-	nx_bool ack;
+#ifndef TOSH_DATA_LENGTH
+#define TOSH_DATA_LENGTH 127
 #endif
-} metadata_t;
 
+#ifndef TOS_BCAST_ADDR
+#define TOS_BCAST_ADDR 0xFFFF
+#endif
 
-typedef nx_struct message_t {
-	nx_uint8_t header[sizeof(message_header_t)];
-	nx_uint8_t data[FENNEC_MSG_DATA_LEN];
-	nx_uint8_t metadata[sizeof(metadata_t)];
-	nx_uint16_t conf;
-} message_t;
+#define RADIO_SEND_RESOURCE "RADIO_SEND_RESOURCE"
 
+typedef uint8_t state_t;
+typedef uint8_t module_t;
+typedef uint8_t layer_t;
+typedef uint8_t event_t;
+typedef uint8_t process_t;
 
-struct event_module_conf {
-	event_t 	event_id;
-	module_t 	module_id;
-	conf_t 		conf_id;
-};
-
-struct stack_configuration {
-	uint16_t conf_id;
+struct network_process {
+	process_t process_id;
 	uint8_t application;
 	uint8_t network;
-	uint8_t mac;
-	uint8_t radio;
-	uint8_t level;
+	uint8_t am;
+	void* application_params;
+	void* network_params;
+	void* am_params;
+	uint8_t application_module;
+	uint8_t network_module;
+	uint8_t am_module;
+	bool am_level;
 };
 
-struct default_params {
-	void 	*application_cache;
-	void 	*application_default_params;
-	int 	application_default_size;
-
-	void 	*network_cache;
-	void 	*network_default_params;
-	int 	network_default_size;
-
-	void 	*mac_cache;
-	void 	*mac_default_params;
-	int 	mac_default_size;
-
-	void 	*radio_cache;
-	void 	*radio_default_params;
-	int 	radio_default_size;
+struct state {
+        state_t 		state_id;
+	struct network_process **processes;
+	uint8_t 		level;
 };
 
+struct event_process {
+	event_t 	event_id;
+	process_t	process_id;
+};
 
 struct fennec_policy {
 	uint16_t  src_conf;
 	uint16_t event_mask;
 	uint16_t  dst_conf;
 };
-
-
 
 #endif

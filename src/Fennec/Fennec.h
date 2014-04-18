@@ -35,26 +35,32 @@
 #ifndef FENNEC_H
 #define FENNEC_H
 
-
 #ifdef FENNEC_TOS_PRINTF
 #define NEW_PRINTF_SEMANTICS
+#define PRINTF_DBG
+#include "printf.h"
+#endif
+
+#ifdef FENNEC_COOJA_PRINTF
+#define NEW_PRINTF_SEMANTICS
+#define PRINTF_DBG
 #include "printf.h"
 #endif
 
 #include "Dbgs.h"
-#include "AM.h"
 
 #include "ff_structs.h"
 #include "ff_flags.h"
-#include "ff_states.h"
-//#include "ff_sensor_type.h"
-//#include "ff_sensor_ids.h"
+#include "fennec_states.h"
 #include "ff_functions.h"
 #include "ff_consts.h"
 
 
-//#include "message.h"
 #include <Ieee154.h>
+
+#include <AM.h>
+#include <message.h>
+#include <Serial.h>
 
 
 #endif
