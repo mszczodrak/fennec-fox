@@ -90,8 +90,10 @@ event void SubAMSend.sendDone(message_t *msg, error_t error) {
 }
 
 event message_t* SubReceive.receive(message_t *msg, void* payload, uint8_t len) {
+	int8_t rssi = (int8_t) call SubPacketRSSI.get(msg);
 #ifdef FENNEC_TOS_PRINTF
-	printf("%d %u\n", (int8_t)call SubPacketRSSI.get(msg), call SubPacketLinkQuality(msg));
+	int8_t lqi = (int8_t) call SubPacketLinkQuality.get(msg);
+	printf("RSSI: %d  LQI: %d\n", rssi, lqi);
 	printfflush();
 #endif
 
@@ -99,11 +101,11 @@ event message_t* SubReceive.receive(message_t *msg, void* payload, uint8_t len) 
 
 	call Leds.led0On();
 
-	if ( ((int8_t)call SubPacketRSSI.get(msg)) > call RssiParams.get_threshold_1() ) {
+	if ( (rssi + call RssiParams.get_rssi_offset()) > call RssiParams.get_threshold_1() ) {
 		call Leds.led1On();
 	}
 
-	if ( ((int8_t)call SubPacketRSSI.get(msg)) > call RssiParams.get_threshold_2() ) {
+	if ( (rssi + call RssiParams.get_rssi_offset()) > call RssiParams.get_threshold_2() ) {
 		call Leds.led2On();
 	}
 
