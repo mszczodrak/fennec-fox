@@ -43,6 +43,7 @@ use application randBeacon $(FENNEC_FOX_LIB)/apps/tests/RandomBeacon (
 
 use application rssi $(FENNEC_FOX_LIB)/apps/tests/Rssi (
 		uint16_t tx_delay = 200,
+		float rssi_scale = 1,
 		int8_t rssi_offset = -45,
 		int8_t threshold_1 = -80,
 		int8_t threshold_2 = -50)
@@ -110,8 +111,27 @@ use am cc2420x $(FENNEC_FOX_LIB)/am/cc2420x (
 		uint8_t channel=26,
 		uint8_t power=31, 
 		uint16_t sleepInterval=0,
-		uint16_t sleepDelay=100,
-		bool autoAck = 1,
+		bool slotted = 0
+)
+
+use am rf212 $(FENNEC_FOX_LIB)/am/rf212 (
+		uint8_t channel=0,
+		uint8_t power=0xE8, 
+		uint16_t sleepInterval=0,
+		bool slotted = 0
+)
+
+use am rf230 $(FENNEC_FOX_LIB)/am/rf230 (
+		uint8_t channel=26,
+		uint8_t power=31, 
+		uint16_t sleepInterval=0,
+		bool slotted = 0
+)
+
+use am atm128rfa1 $(FENNEC_FOX_LIB)/am/atm128rfa1 (
+		uint8_t channel=26,
+		uint8_t power=0x00, 
+		uint16_t sleepInterval=0,
 		bool slotted = 0
 )
 
