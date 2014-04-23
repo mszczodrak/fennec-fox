@@ -26,32 +26,59 @@
  */
 
 /**
-  * Fennec Fox sensor types
+  * Fennec Fox SerialDbgs Module
   *
   * @author: Marcin K Szczodrak
   * @updated: 09/08/2013
   */
 
+#include <Fennec.h>
+#include "DebugMsg.h"
 
-#ifndef FF_SENSOR_TYPE_H
-#define FF_SENSOR_TYPE_H
+module SerialDbgsP @safe() {
+#ifdef __DBGS__
+uses interface AMSend;
+#endif
+}
 
-/**
-  * Define sensor types 
-  */
-typedef enum {
-  F_SENSOR_UNKNOWN		= 0,
-  F_SENSOR_TEMPERATURE  	= 1,
-  F_SENSOR_LIGHT        	= 2,
-  F_SENSOR_HUMIDITY     	= 3,
-  F_SENSOR_SOUND        	= 4,
-  F_SENSOR_MOTION       	= 5,
-  F_SENSOR_CAMERA       	= 6,
-  F_SENSOR_VIBRATION    	= 7,
-  F_SENSOR_MAGNETIC     	= 8,
-  F_SENSOR_ACCELEROMETER 	= 9,
-  F_SENSOR_TOUCH		= 10,
-  F_SENSOR_THIN_FORCE		= 11,
-} sensor_type_t;
+implementation {
+
+#ifdef __DBGS__
+message_t packet;
+norace struct debug_msg *dmsg = NULL;
+bool busy = FALSE;
+
+event void AMSend.sendDone(message_t* bufPtr, error_t error) {
+	busy = FALSE;
+}
 
 #endif
+void dbgs(process_t process, uint8_t layer, uint8_t dbg_state, uint16_t d0, uint16_t d1) @C() {
+#ifdef __DBGS__
+	if (busy) {
+		return;
+	}
+
+	if (dmsg == NULL) {
+		dmsg = (struct debug_msg*) call AMSend.getPayload(&packet, sizeof(struct debug_msg));
+		if (dmsg == NULL) {
+			return;
+		}
+	}
+
+	busy = TRUE;
+
+	dmsg->process = process;
+	dmsg->layer = layer;
+	dmsg->state = dbg_state;
+	dmsg->d0 = d0;
+	dmsg->d1 = d1;
+
+	if (call AMSend.send(AM_BROADCAST_ADDR, &packet, sizeof(struct debug_msg)) != SUCCESS) {
+		signal AMSend.sendDone(&packet, FAIL);
+	}
+#endif
+}
+
+}
+

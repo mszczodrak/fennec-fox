@@ -26,29 +26,28 @@
  */
 
 /**
-  * Fennec Fox Dbgs messages
+  * Fennec Fox SerialDbgs Module
   *
   * @author: Marcin K Szczodrak
   * @updated: 09/08/2013
   */
 
 
-#ifndef __DEBUG_SERIAL_H
-#define __DEBUG_SERIAL_H
+#include <Fennec.h>
+#include "DebugMsg.h"
 
-#include "ff_structs.h"
+configuration SerialDbgsC {
+}
 
-struct debug_msg {
-	process_t process;
-	uint8_t layer;
-	uint8_t state;
-	uint16_t d0;
-	uint16_t d1;
-};
+implementation {
 
-enum {
-	AM_DEBUG_MSG = 100,
-	DBG_BUFFER_SIZE  = 250,	
-};
+components SerialDbgsP;
 
+#ifdef __DBGS__
+components SerialActiveMessageC as SerialAM;
+SerialDbgsP.AMSend -> SerialAM.AMSend[AM_DEBUG_MSG];
+components SerialStartC;
 #endif
+
+}
+

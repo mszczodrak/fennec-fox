@@ -46,7 +46,6 @@ implementation {
 components MainC;
 components FennecP;
 components LedsC;
-components FennecSerialDbgC;
 components NetworkStateC;
 components RandomC;
 
@@ -56,7 +55,6 @@ Event = FennecP;
 
 FennecP.Boot -> MainC;
 FennecP.Leds -> LedsC;
-FennecSerialDbgC.Boot -> MainC;
 FennecP.SplitControl -> NetworkStateC;
 FennecP.Random -> RandomC;
 
@@ -73,5 +71,6 @@ components SerialPrintfC;
 components LoggerC;
 #endif
 
+components SerialDbgsC;
 }
 

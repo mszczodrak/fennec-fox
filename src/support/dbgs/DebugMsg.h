@@ -26,36 +26,28 @@
  */
 
 /**
-  * Fennec Fox Dbgs Module
+  * Fennec Fox Dbgs messages
   *
   * @author: Marcin K Szczodrak
   * @updated: 09/08/2013
   */
 
 
-#include <Fennec.h>
-#include "DebugMsg.h"
+#ifndef __DEBUG_SERIAL_H
+#define __DEBUG_SERIAL_H
 
-configuration FennecSerialDbgC {
-uses interface Boot;
-}
+#include "ff_structs.h"
 
-implementation {
+struct debug_msg {
+	process_t process;
+	uint8_t layer;
+	uint8_t state;
+	uint16_t d0;
+	uint16_t d1;
+};
 
-components FennecSerialDbgP;
-Boot = FennecSerialDbgP;
+enum {
+	AM_DEBUG_MSG = 0x89,
+};
 
-#ifdef __DBGS__
-components SerialActiveMessageC as SerialAM;
-FennecSerialDbgP.SplitControl -> SerialAM;
-FennecSerialDbgP.Receive -> SerialAM.Receive[AM_DEBUG_MSG];
-FennecSerialDbgP.AMSend -> SerialAM.AMSend[AM_DEBUG_MSG];
-
-components new QueueC(struct debug_msg, DBG_BUFFER_SIZE);
-FennecSerialDbgP.Queue -> QueueC;
 #endif
-
-components LedsC;
-FennecSerialDbgP.Leds -> LedsC;
-}
-
