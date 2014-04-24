@@ -55,6 +55,8 @@ uses interface PacketField<uint8_t> as SubPacketRSSI;
 uses interface Leds;
 uses interface Timer<TMilli>;
 
+uses interface SerialDbgs;
+
 }
 
 implementation {
@@ -69,39 +71,33 @@ implementation {
 
 
 message_t packet;
-bool sendBusy = FALSE;
 uint16_t seqno;
 
 command error_t SplitControl.start() {
 	uint32_t send_delay = call CounterParams.get_delay() * 
 		call CounterParams.get_delay_scale();
-	dbgs(process, F_APPLICATION, S_NONE, 0, 0);
-	dbg("Application", "[%d] Counter SplitControl.start()", process);
 
-	dbg("Application", "[%d] Counter starting delay: %d", process, send_delay);
-	dbg("Application", "[%d] Counter starting src: %d  dest: %d", process,
-		call CounterParams.get_src(), call CounterParams.get_dest());
 	seqno = 0;
-	sendBusy = FALSE;
 
 	if ((call CounterParams.get_src() == BROADCAST) || 
 	(call CounterParams.get_src() == TOS_NODE_ID)) {
 		call Timer.startPeriodic(send_delay);
 	}
 
+	call SerialDbgs.dbgs(DBGS_MGMT_START, process, 0, 0);
 	signal SplitControl.startDone(SUCCESS);
 	return SUCCESS;
 }
 
 command error_t SplitControl.stop() {
 	call Timer.stop();
-	dbg("Application", "[%d] Counter SplitControl.stop()", process);
-	dbgs(process, F_APPLICATION, DBGS_MGMT_STOP, 0, 0);
+	call SerialDbgs.dbgs(DBGS_MGMT_STOP, process, 0, 0);
 	signal SplitControl.stopDone(SUCCESS);
 	return SUCCESS;
 }
 
-void sendMessage() {
+task void sendMessage() {
+	error_t e;
 	CounterMsg* msg = (CounterMsg*)call SubAMSend.getPayload(&packet,
 							sizeof(CounterMsg));
 	if (msg == NULL) {
@@ -111,55 +107,29 @@ void sendMessage() {
 	msg->source = TOS_NODE_ID;
 	msg->seqno = seqno;
 
-
-	if (call SubAMSend.send(call CounterParams.get_dest(), &packet, 
-					sizeof(CounterMsg)) != SUCCESS) {
-		dbgs(process, F_APPLICATION, DBGS_SEND_DATA, seqno, call CounterParams.get_dest());
-		dbg("Application", "[%d] Counter sendMessage() seqno: %d source: %d - FAILED", 
-					process, msg->seqno, msg->source); 
-	} else {
-		sendBusy = TRUE;
-		dbgs(process, F_APPLICATION, DBGS_SEND_DATA, seqno, call CounterParams.get_dest());
-		dbg("Application", "[%d] Counter call SubAMSend.send(%d, 0x%1x, %d)",
-					process, 
-					call CounterParams.get_dest(), &packet,
+	e = call SubAMSend.send(call CounterParams.get_dest(), &packet, 
 					sizeof(CounterMsg));
-		call Leds.set(seqno);
+	if (e != SUCCESS) {
+		signal SubAMSend.sendDone(&packet, e);
 	}
 }
 
 event void Timer.fired() {
-	if (!sendBusy) {
-		dbg("Application", "[%d] Counter Timer.fired()", process);
-		sendMessage();
-	} else {
-		dbgs(process, F_APPLICATION, DBGS_BUSY, seqno, call CounterParams.get_dest());
-	}
 	seqno++;
+	post sendMessage();
 }
 
 event void SubAMSend.sendDone(message_t *msg, error_t error) {
-	//CounterMsg* cm = (CounterMsg*)call SubAMSend.getPayload(msg,
-	//						sizeof(CounterMsg));
-	if (error != SUCCESS) {
-		dbgs(process, F_APPLICATION, DBGS_ERROR_SEND_DONE, seqno, call CounterParams.get_dest());
-	}
-	dbg("Application", "[%d] Counter event SubAMSend.sendDone(0x%1x, %d)",
-				process, msg, error);
-	sendBusy = FALSE;
+	call Leds.set(seqno);
+	call SerialDbgs.dbgs(DBGS_SEND_DATA, error, seqno, 
+				call CounterParams.get_dest());
 }
 
 
 event message_t* SubReceive.receive(message_t *msg, void* payload, uint8_t len) {
 	CounterMsg* cm = (CounterMsg*)payload;
-
-	dbg("Application", "[%d] Counter event SubReceive.receive(0x%1x, 0x%1x, %d)",
-				process,  msg, payload, len); 
-	dbg("Application", "[%d] Counter receive seqno: %d source: %d", 
-				process, cm->seqno, cm->source); 
-
 	call Leds.set(cm->seqno);
-	dbgs(process, F_APPLICATION, DBGS_RECEIVE_DATA, cm->seqno, cm->source);
+	call SerialDbgs.dbgs(DBGS_RECEIVE_DATA, len, cm->seqno, cm->source);
 	return msg;
 }
 

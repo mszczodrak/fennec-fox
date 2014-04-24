@@ -33,52 +33,132 @@
   */
 
 #include <Fennec.h>
-#include "DebugMsg.h"
+#include "SerialDbgs.h"
 
 module SerialDbgsP @safe() {
+provides interface SerialDbgs[uint8_t id];
+uses interface Boot;
+uses interface Leds;
 #ifdef __DBGS__
-uses interface AMSend;
+uses interface AMSend as SerialAMSend;
+uses interface AMPacket as SerialAMPacket;
+uses interface Packet as SerialPacket;
+uses interface SplitControl as SerialSplitControl;
 #endif
 }
 
 implementation {
 
 #ifdef __DBGS__
+nx_struct debug_msg *dmsg = NULL;
 message_t packet;
-norace struct debug_msg *dmsg = NULL;
-bool busy = FALSE;
+nx_struct debug_msg queue[DBGS_QUEUE_LEN];
+norace uint8_t head = 0;
+norace uint8_t tail = 0;
+norace uint8_t size = 0;
+norace bool busy = FALSE;
 
-event void AMSend.sendDone(message_t* bufPtr, error_t error) {
-	busy = FALSE;
-}
+task void sendMessage() {
+	if (size == 0) {
+		return;
+	}
 
-#endif
-void dbgs(process_t process, uint8_t layer, uint8_t dbg_state, uint16_t d0, uint16_t d1) @C() {
-#ifdef __DBGS__
-	if (busy) {
+	if (busy == TRUE) {
 		return;
 	}
 
 	if (dmsg == NULL) {
-		dmsg = (struct debug_msg*) call AMSend.getPayload(&packet, sizeof(struct debug_msg));
-		if (dmsg == NULL) {
-			return;
-		}
+		dmsg = (nx_struct debug_msg*) call SerialAMSend.getPayload(&packet,
+                        sizeof(nx_struct debug_msg));
+		return;
 	}
 
 	busy = TRUE;
 
-	dmsg->process = process;
-	dmsg->layer = layer;
-	dmsg->state = dbg_state;
-	dmsg->d0 = d0;
-	dmsg->d1 = d1;
-
-	if (call AMSend.send(AM_BROADCAST_ADDR, &packet, sizeof(struct debug_msg)) != SUCCESS) {
-		signal AMSend.sendDone(&packet, FAIL);
+	dmsg->version = queue[head].version;
+	dmsg->id = queue[head].version;
+	dmsg->dbg = queue[head].dbg;
+	dmsg->d0 = queue[head].d0;
+	dmsg->d1 = queue[head].d1;
+	dmsg->d2 = queue[head].d2;
+	if (call SerialAMSend.send(AM_BROADCAST_ADDR, &packet, sizeof(nx_struct debug_msg)) != SUCCESS) {
+		signal SerialAMSend.sendDone(&packet, FAIL);
 	}
+}
+
+task void startSerial() {
+	error_t e;
+	e = call SerialSplitControl.start();
+	if (e == EALREADY) {
+		signal SerialSplitControl.startDone(SUCCESS);
+		return;
+	}
+
+	if (e != SUCCESS) {
+		post startSerial();
+	}
+}
+
+#endif
+
+
+
+event void Boot.booted() {
+#ifdef __DBGS__
+	post startSerial();
 #endif
 }
+
+command void SerialDbgs.dbgs[uint8_t id](uint8_t dbg, uint16_t d0, uint16_t d1, uint16_t d2) {
+#ifdef __DBGS__
+	if (size >= DBGS_QUEUE_LEN) {
+		return;
+	}
+
+	if (dmsg == NULL) {
+		dmsg = (nx_struct debug_msg*) call SerialAMSend.getPayload(&packet,
+                        sizeof(nx_struct debug_msg));
+		return;
+	}
+
+	queue[tail].version = SERIAL_DBG_VERSION;
+	queue[tail].id = id;
+	queue[tail].dbg = dbg;
+	queue[tail].d0 = d0;
+	queue[tail].d1 = d1;
+	queue[tail].d2 = d2;
+	tail++;
+	if (tail == DBGS_QUEUE_LEN) tail = 0;
+	size++;
+	post sendMessage();
+#endif
+}
+
+#ifdef __DBGS__
+
+event void SerialSplitControl.startDone(error_t error) {
+	if (error == SUCCESS) {
+		dmsg = (nx_struct debug_msg*) call SerialAMSend.getPayload(&packet,
+                        sizeof(uint32_t));
+	} else {
+		post startSerial();
+	}
+}
+
+event void SerialSplitControl.stopDone(error_t error) {
+}
+
+event void SerialAMSend.sendDone(message_t* bufPtr, error_t error) {
+	if (size != 0) {
+		head++;
+		if (head == DBGS_QUEUE_LEN) head = 0;
+		size--;
+	}
+	busy = FALSE;
+	post sendMessage();
+
+}
+#endif
 
 }
 

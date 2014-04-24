@@ -36,7 +36,24 @@
 #ifndef __DBGS_H_
 #define __DBGS_H_
 
+#include "../../Fennec/ff_structs.h"
 
+nx_struct debug_msg {
+        nx_uint8_t version;
+        nx_uint8_t id;
+        nx_uint8_t dbg;
+        nx_uint16_t d0;
+        nx_uint16_t d1;
+        nx_uint16_t d2;
+};
+
+enum {
+	SERIAL_DBG_VERSION = 5,
+        AM_DEBUG_MSG = 0x89,
+	DBGS_QUEUE_LEN = 100,
+};
+
+#define DBGS_NONE		0
 #define DBGS_SEND_DATA		1
 #define DBGS_SEND_BEACON	2
 #define DBGS_RECEIVE_DATA 	3
@@ -99,7 +116,5 @@
 
 #define DBGS_TIMER_FIRED			160
 #define DBGS_BUSY				161
-
-#define DBGS_TEST_SIGNAL	32767
 
 #endif
