@@ -62,9 +62,10 @@ enum {
 #define DBGS_MGMT_START		5
 #define DBGS_MGMT_STOP		6
 
-#define DBGS_MEMORY_EMPTY	7
-#define DBGS_BLINK_LED		8
-#define DBGS_SYNC		10
+#define DBGS_START		7
+#define DBGS_START_DONE		8
+#define DBGS_STOP		9
+#define DBGS_STOP_DONE		10
 
 #define DBGS_GOT_SEND				20
 #define DBGS_GOT_SEND_HEADER_NULL_FAIL		21
@@ -116,5 +117,9 @@ enum {
 
 #define DBGS_TIMER_FIRED			160
 #define DBGS_BUSY				161
+#define DBGS_SERIAL_SEND_MESSAGE		190
+#define DBGS_SERIAL_SEND_FAIL			191
+#define DBGS_SERIAL_QUEUE_FULL			192
+#define DBGS_SERIAL_NULL_PTR			193
 
 #endif
