@@ -15,7 +15,6 @@ include $(FENNEC_FOX_LIB)/support/make/tinyos.extra
 #CFLAGS += -DPRINTF_BUFFER_SIZE=200
 #CFLAGS += -DFENNEC_TOS_PRINTF
 #CFLAGS += -DFENNEC_COOJA_PRINTF
-#CFLAGS += -DFENNEC_LOGGER
 
 clean: FORCE
 	rm -rf build $(CLEAN_EXTRA) pp
