@@ -39,21 +39,25 @@
 #include <Fennec.h>
 #include "ff_structs.h"
 
+/*   0          byte          1 
+ *   |  PROC_ID   |  DATA_ID  |      
+ */
+#define LOW_PROC_ID(x) (x >> 4)
+#define LOW_DATA_ID(x) (x & 0x0F)
+
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 
-/*
-metadata_t* getMetadata( message_t* msg ) @C() {
-        return (metadata_t*)msg->metadata;
-}
-*/
+#define _MILLI_2_32KHZ(x) ((x) << 5)
+#define _32KHZ_2_MILLI(x) ((x) >> 5)
 
 uint32_t gcdr (uint32_t a, uint32_t b )@C() {
         if ( a==0 ) return b;
         return gcdr ( b%a, a );
 }
 
-bool validProcessId(process_t process_id);
+bool validProcessId(nx_uint8_t msg_type);
+nx_uint8_t setFennecType(nx_uint8_t id);
 
 #ifdef FENNEC_LOGGER
 void insertLog(uint16_t from, uint16_t message);

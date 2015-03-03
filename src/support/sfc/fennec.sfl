@@ -15,9 +15,42 @@ use application blink $(FENNEC_FOX_LIB)/apps/tests/Blink (
 
 use application counter $(FENNEC_FOX_LIB)/apps/tests/Counter ( 
 		uint16_t delay,
-		uint16_t delay_scale,
-		uint16_t src,
-		uint16_t dest )
+		uint16_t delay_scale = 1,
+		uint16_t src = 0,
+		uint16_t dest = 0,
+		uint8_t repeat = 1,
+		uint16_t receive_event )
+
+use application sample $(FENNEC_FOX_LIB)/apps/sampleData ( 
+		uint32_t delay,
+		uint16_t src = 0,
+		uint16_t dest = 0,
+		uint16_t receive_event )
+
+use application button $(FENNEC_FOX_LIB)/apps/button (
+		uint8_t button_in = 0,
+		uint16_t mote_addr = 0xFFFF )
+
+use application serialVar8 $(FENNEC_FOX_LIB)/apps/serialVars8 (
+		uint8_t val1 = 0,
+		uint8_t val2 = 0,
+		uint8_t val3 = 0 )
+
+use application serialVar16 $(FENNEC_FOX_LIB)/apps/serialVars16 (
+		uint16_t val1 = 0,
+		uint16_t val2 = 0,
+		uint16_t val3 = 0 )
+
+use application serialVar32 $(FENNEC_FOX_LIB)/apps/serialVars32 (
+		uint32_t val1 = 0,
+		uint32_t val2 = 0,
+		uint32_t val3 = 0 )
+
+use application down_sample $(FENNEC_FOX_LIB)/apps/down_sample (
+		uint16_t input = 0,
+		uint16_t output = 0,
+		uint16_t scale = 0 )
+
 
 use application dbgs $(FENNEC_FOX_LIB)/apps/tests/Dbgs (uint16_t delay = 1024)
 
@@ -38,8 +71,8 @@ use application z1Sens $(FENNEC_FOX_LIB)/apps/tests/Z1Sensors (
 		uint16_t sampling_rate = 1024)
 
 use application randBeacon $(FENNEC_FOX_LIB)/apps/tests/RandomBeacon ( 
-		uint16_t delay,
-		uint16_t delay_scale)
+		uint16_t delay = 1024,
+		uint16_t delay_scale = 1)
 
 use application rssi $(FENNEC_FOX_LIB)/apps/tests/Rssi (
 		uint16_t tx_delay = 200,
@@ -47,6 +80,42 @@ use application rssi $(FENNEC_FOX_LIB)/apps/tests/Rssi (
 		int8_t rssi_offset = -45,
 		int8_t threshold_1 = -80,
 		int8_t threshold_2 = -50)
+
+use application neighbor $(FENNEC_FOX_LIB)/apps/Neighbors (
+		uint8_t neighborhood_min_size = 4,
+		uint8_t max_num_of_poor_neighbors = 1,
+		uint8_t good_etx = 90,
+		uint8_t num_to_check = 100,
+		uint8_t tx_power = 31,
+		uint16_t tx_delay = 5000)
+
+use application neighborSimple $(FENNEC_FOX_LIB)/apps/NeighborsSimple (
+		uint8_t neighborhood_min_size = 4,
+		uint8_t max_num_of_poor_neighbors = 1,
+		uint8_t num_to_check = 100,
+		uint8_t tx_power = 31,
+		uint16_t tx_delay = 5000)
+
+use application neighborRssi $(FENNEC_FOX_LIB)/apps/NeighborsRssi (
+		uint8_t neighborhood_min_size = 4,
+		uint8_t max_num_of_poor_neighbors = 1,
+		float rssi_scale = 1,
+		int8_t rssi_offset = -45,
+		int8_t good_rssi = -60,
+		uint8_t num_to_check = 100,
+		uint8_t tx_power = 31,
+		uint16_t tx_delay = 5000)
+
+
+use application fixTX $(FENNEC_FOX_LIB)/apps/tests/FixRadioTx (
+		uint8_t tx_power = 31,
+		uint16_t offset = 0)
+
+use application fixSensorData $(FENNEC_FOX_LIB)/apps/tests/FixSensorData (
+		uint16_t delay,
+		uint16_t delay_scale = 1,
+		uint16_t src = 0,
+		uint16_t data = 0)
 
 use application testSerial $(FENNEC_FOX_LIB)/apps/tests/TestSerial ( 
 		uint8_t led=1,
@@ -67,18 +136,92 @@ use application StateSync $(FENNEC_FOX_LIB)/apps/StateSynchronization (
 		uint16_t send_delay = 1000
 )
 
+use application DataSync $(FENNEC_FOX_LIB)/apps/DataSynchronization (
+		uint16_t send_delay = 1000
+)
+
+use application BEDS $(FENNEC_FOX_LIB)/apps/BEDS (
+		uint16_t send_delay = 1000
+)
+
+use application TestDataSync $(FENNEC_FOX_LIB)/apps/tests/TestDataSync (
+		uint32_t update_delay = 25000,
+		uint16_t val1 = 0,
+		uint16_t val2 = 0,
+		uint16_t val3 = 0,
+		uint16_t val4 = 0,
+		uint16_t val5 = 0
+)
+
+use application TestDataMerge $(FENNEC_FOX_LIB)/apps/tests/TestDataMerge (
+                uint32_t update_delay = 25000,
+                uint16_t val1 = 0,
+                uint16_t val2 = 0,
+                uint16_t mote1 = 0,
+                uint16_t mote2 = 0
+)
+
+use application TestDataRandom $(FENNEC_FOX_LIB)/apps/tests/TestDataRandom (
+                uint32_t update_delay = 25000,
+                uint16_t val1 = 0,
+                uint16_t val2 = 0,
+                uint16_t mote1 = 0,
+                uint16_t mote2 = 0
+)
+
+use application TestDataSyncSource $(FENNEC_FOX_LIB)/apps/tests/TestDataSyncSource (
+		uint16_t src = 0xFFFF,
+		uint32_t update_delay = 25000,
+		uint16_t val1 = 0,
+		uint16_t val2 = 0,
+		uint16_t val3 = 0,
+		uint16_t val4 = 0,
+		uint16_t val5 = 0
+)
+
+use application TestDataSyncSem $(FENNEC_FOX_LIB)/apps/tests/TestDataSyncSem (
+		uint32_t update_delay = 25000,
+		uint16_t val1 = 0,
+		uint16_t val2 = 0,
+		uint16_t val3 = 0,
+		uint16_t val4 = 0,
+		uint16_t val5 = 0
+)
+
+use application TestMax $(FENNEC_FOX_LIB)/apps/tests/TestMax (
+		uint32_t sense_delay = 5000,
+		uint32_t expire_delay = 614400,		# 10 minutes
+		uint32_t max_sensed = 0
+)
+
+use application NetworkRadioSetup $(FENNEC_FOX_LIB)/apps/network_rssi()
+
+use application ftsp $(FENNEC_FOX_LIB)/apps/ftsp (uint32_t beacon_rate,
+		float skew, uint32_t localAverage, int32_t offsetAverage)
+
+use application fixDest $(FENNEC_FOX_LIB)/apps/tests/FixDest(
+		uint16_t dest = 0,
+		uint16_t offset = 0)
+
+use application fixChannel $(FENNEC_FOX_LIB)/apps/tests/FixRadioChannel(
+		uint8_t channel = 0,
+		uint16_t offset = 0)
+
+
 # net Modules
 
 use network nullNet $(FENNEC_FOX_LIB)/net/nullNet ()
 
-use network ctp $(FENNEC_FOX_LIB)/net/ctp (uint16_t root)
-
-use network ftsp $(FENNEC_FOX_LIB)/net/ftsp ()
+use network ctp $(FENNEC_FOX_LIB)/net/ctp (uint16_t root = 0, uint16_t etx = 64000)
 
 use network rebroadcast $(FENNEC_FOX_LIB)/net/rebroadcast (
-	uint8_t repeat = 1,
-	uint8_t retry = 9,
-	uint16_t retry_delay = 25
+		uint8_t repeat = 3,
+		uint16_t retry_delay = 25
+)
+
+use network EED $(FENNEC_FOX_LIB)/net/EED (
+		uint32_t delay = 15,
+		uint32_t last_finish = 0
 )
 
 use network trickle $(FENNEC_FOX_LIB)/net/trickle (
@@ -95,6 +238,7 @@ use network tricklePlus $(FENNEC_FOX_LIB)/net/tricklePlus (
 		uint8_t scale = 10
 )
 
+use network dip $(FENNEC_FOX_LIB)/net/dip ()
 
 use network SyncNet $(FENNEC_FOX_LIB)/net/cuNet ()
 
@@ -130,7 +274,14 @@ use am rf212 $(FENNEC_FOX_LIB)/am/rf212 (
 
 use am rf230 $(FENNEC_FOX_LIB)/am/rf230 (
 		uint8_t channel=26,
-		uint8_t power=31, 
+		uint8_t power=0, 
+		uint16_t sleepInterval=0,
+		bool slotted = 0
+)
+
+use am rf231 $(FENNEC_FOX_LIB)/am/rf231 (
+		uint8_t channel=26,
+		uint8_t power=0, 
 		uint16_t sleepInterval=0,
 		bool slotted = 0
 )
@@ -146,5 +297,54 @@ use am nullAM $(FENNEC_FOX_LIB)/am/nullAM ()
 
 
 # Events
-use source timerMilliE $(FENNEC_FOX_LIB)/apps/timerMilli (uint32_t delay = 1000, uint16_t src = 0xffff)
-use source timerSecondE $(FENNEC_FOX_LIB)/apps/timerSecond (uint32_t delay = 1000, uint16_t src = 0xffff)
+
+use source timerMilliE $(FENNEC_FOX_LIB)/apps/timerMilli (
+		uint32_t delay = 1000, 
+		uint16_t src = 0xffff,
+		uint32_t start_32khz = 0
+)
+
+use source timerSecondE $(FENNEC_FOX_LIB)/apps/timerSecond (
+		uint32_t delay = 1000, 
+		uint16_t src = 0xffff,
+		uint32_t start_32khz = 0
+)
+
+use source timerMinuteE $(FENNEC_FOX_LIB)/apps/timerMinute (
+		uint32_t delay = 1, 
+		uint16_t src = 0xffff,
+		uint32_t start_32khz = 0
+)
+
+use source timerHourE $(FENNEC_FOX_LIB)/apps/timerHour (
+		uint32_t delay = 1,
+		uint16_t src = 0xffff,
+		uint32_t start_32khz = 0
+)
+
+use source noActivityE $(FENNEC_FOX_LIB)/apps/noActivity (
+		uint32_t delay = 1000,
+		uint16_t src = 0xffff,
+		float completed = 0.75, 
+		uint16_t activity
+)
+
+use source noSignalE $(FENNEC_FOX_LIB)/apps/noSignal (
+		uint16_t src = 0,
+		uint16_t input = 0,
+		uint16_t delay = 0,
+		uint16_t delay_scale = 1
+)
+
+use source networkMinE $(FENNEC_FOX_LIB)/apps/networkMin (
+		uint16_t local = 0xFFFE,
+		uint16_t global = 0,
+		uint32_t delay = 10240, 
+		uint16_t threshold = 300
+)
+
+use source groupById $(FENNEC_FOX_LIB)/apps/groupById (
+		uint16_t first_address = 0xffff,
+		uint16_t last_address = 0xffff
+)
+

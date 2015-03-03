@@ -128,6 +128,8 @@ generic module CtpRoutingEngineP(uint8_t routingTableSize, uint32_t minInterval,
 	interface CompareBit;
 
     }
+    uses interface Param;
+    uses interface SerialDbgs;
 }
 
 
@@ -182,6 +184,22 @@ implementation {
     uint32_t t; 
     bool tHasPassed;
 
+task void routeUpdate() {
+	uint16_t new_etx = routeInfo.etx + call LinkEstimator.getLinkQuality(routeInfo.parent);
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[-] Network CTP Parent %u   etx %u   changes %lu\n", routeInfo.parent,
+		routeInfo.etx + call LinkEstimator.getLinkQuality(routeInfo.parent), parentChanges);
+#else
+        call SerialDbgs.dbgs(DBGS_NETWORK_ROUTING_UPDATE, parentChanges,
+			routeInfo.parent, new_etx);
+#endif
+#endif
+	if (new_etx < MAX_METRIC) {
+		call Param.set(ETX, &new_etx, sizeof(new_etx));
+	}
+}
+
     void chooseAdvertiseTime() {
        t = currentInterval;
        t /= 2;
@@ -211,21 +229,16 @@ implementation {
     }
 
     command error_t Init.init() {
-#ifdef TOSSIM
-        uint8_t maxLength;
-#endif
         radioOn = FALSE;
         running = FALSE;
         parentChanges = 0;
         state_is_root = 0;
         routeInfoInit(&routeInfo);
         routingTableInit();
+	currentInterval = minInterval;
         beaconMsg = call BeaconSend.getPayload(&beaconMsgBuffer, call BeaconSend.maxPayloadLength());
-#ifdef TOSSIM
-        maxLength = call BeaconSend.maxPayloadLength();
         dbg("TreeRoutingCtl","TreeRouting initialized. (used payload:%d max payload:%d!\n", 
-              sizeof(beaconMsg), maxLength);
-#endif
+              sizeof(beaconMsg), call BeaconSend.maxPayloadLength());
         return SUCCESS;
     }
 
@@ -234,7 +247,8 @@ implementation {
       //start will (re)start the sending of messages
       if (!running) {
 	running = TRUE;
-	resetInterval();
+        currentInterval = minInterval;
+	chooseAdvertiseTime();
 	call RouteTimer.startPeriodic(BEACON_INTERVAL);
 	dbg("TreeRoutingCtl","%s running: %d radioOn: %d\n", __FUNCTION__, running, radioOn);
       }     
@@ -376,6 +390,8 @@ implementation {
 		}
             }
         }    
+
+        post routeUpdate();
 
         /* Finally, tell people what happened:  */
         /* We can only loose a route to a parent if it has been evicted. If it hasn't 
@@ -835,5 +851,9 @@ implementation {
     command am_addr_t CtpInfo.getNeighborAddr(uint8_t n) {
       return (n < routingTableActive)? routingTable[n].neighbor:AM_BROADCAST_ADDR;
     }
+
+
+event void Param.updated(uint8_t var_id, bool conflict) {
+}
     
 } 

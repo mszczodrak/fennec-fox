@@ -107,18 +107,19 @@ uses interface PacketAcknowledgements as SubPacketAcknowledgements;
 uses interface Receive as SubReceive;
 uses interface Receive as SubSnoop;
 
+uses interface Param;
 }
 
 implementation {
   enum {
     CLIENT_COUNT = uniqueCount(UQ_CTP_CLIENT),
-    FORWARD_COUNT = 12,
-    TREE_ROUTING_TABLE_SIZE = 10,
+    FORWARD_COUNT = 30,
+    TREE_ROUTING_TABLE_SIZE = 20,
     QUEUE_SIZE = CLIENT_COUNT + FORWARD_COUNT,
     CACHE_SIZE = 4,
   };
 
-  components new CtpForwardingEngineP() as Forwarder;
+  components new CtpForwardingEngineP(0) as Forwarder;
   components MainC, LedsC;
   
   Send = Forwarder;
@@ -154,6 +155,7 @@ implementation {
   StdControl = Estimator;
   RootControl = Router;
   UnicastNameFreeRouting = Router;
+  Param = Router;
 
   MainC.SoftwareInit -> Router;
   Router.BeaconSend -> Estimator.Send;
@@ -220,5 +222,9 @@ SubPacket = AMQueueCtrlP.Packet;
 
 CtpMultiplexC.QueueSend -> AMQueueCtrlP;
 StdControl = AMQueueCtrlP;
+
+components SerialDbgsC;
+Router.SerialDbgs -> SerialDbgsC.SerialDbgs[200];
+Forwarder.SerialDbgs -> SerialDbgsC.SerialDbgs[200];
 
 }

@@ -13,7 +13,7 @@ provides interface PacketField<uint8_t> as PacketLinkQuality;
 provides interface PacketField<uint8_t> as PacketTransmitPower;
 provides interface PacketField<uint8_t> as PacketRSSI;
 
-uses interface rebroadcastParams;
+uses interface Param;
 
 uses interface AMSend as SubAMSend;
 uses interface Receive as SubReceive;
@@ -28,13 +28,17 @@ uses interface RadioChannel;
 uses interface PacketField<uint8_t> as SubPacketLinkQuality;
 uses interface PacketField<uint8_t> as SubPacketTransmitPower;
 uses interface PacketField<uint8_t> as SubPacketRSSI;
+
+uses interface PacketTimeStamp<TMilli, uint32_t> as SubPacketTimeStampMilli;
+uses interface PacketTimeStamp<T32khz, uint32_t> as SubPacketTimeStamp32khz;
+
 }
 
 implementation {
 
 components new rebroadcastP(process);
 SplitControl = rebroadcastP;
-rebroadcastParams = rebroadcastP;
+Param = rebroadcastP;
 AMSend = rebroadcastP.AMSend;
 Receive = rebroadcastP.Receive;
 Snoop = rebroadcastP.Snoop;
@@ -61,4 +65,10 @@ rebroadcastP.Timer -> TimerMilliC;
 PacketLinkQuality = SubPacketLinkQuality;
 PacketTransmitPower = SubPacketTransmitPower;
 PacketRSSI = SubPacketRSSI;
+
+SubPacketTimeStampMilli = rebroadcastP.SubPacketTimeStampMilli;
+SubPacketTimeStamp32khz = rebroadcastP.SubPacketTimeStamp32khz;
+
+components RandomC;
+rebroadcastP.Random -> RandomC;
 }

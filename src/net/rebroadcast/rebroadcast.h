@@ -1,8 +1,6 @@
 #ifndef __rebroadcast_H_
 #define __rebroadcast_H_
 
-nx_struct rebroadcast_header {
-	nx_uint8_t repeat;
-};
+#define SUPPRESS_REBROADCAST	6
 
 #endif

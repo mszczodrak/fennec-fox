@@ -103,7 +103,6 @@ implementation
 		return ((void*)msg) + sizeof(message_t) - call RadioPacket.metadataLength(msg);
 	}
 
-	norace uint32_t on_time;
 
 /*----------------- STATE -----------------*/
 
@@ -597,14 +596,6 @@ implementation
 			cmd = CMD_SIGNAL_DONE;
 	}
 
-	task void reportStop() {
-		call SerialDbgs.dbgs(DBGS_STOP, 242, on_time >> 16, (uint16_t) on_time);
-	}
-
-	task void reportStart() {
-		call SerialDbgs.dbgs(DBGS_START, 242, on_time >> 16, (uint16_t) on_time);
-	}
-
 	tasklet_async command error_t RadioState.turnOff()
 	{
 		if( cmd != CMD_NONE )
@@ -624,8 +615,6 @@ implementation
 		cmd = CMD_TURNOFF;
 		call Tasklet.schedule();
 
-		atomic on_time = call LocalTime.get() - on_time;
-		post reportStop();
 		return SUCCESS;
 	}
 	
@@ -670,9 +659,6 @@ implementation
 
 		cmd = CMD_TURNON;
 		call Tasklet.schedule();
-
-		atomic on_time = call LocalTime.get();
-		post reportStart();
 		return SUCCESS;
 	}
 
@@ -805,6 +791,7 @@ implementation
 			state = STATE_BUSY_TX_2_RX_ON;
 		}
 
+
 #ifdef RADIO_DEBUG_MESSAGES
 		txMsg = msg;
 		
@@ -905,11 +892,9 @@ implementation
 		len = getHeader(msg)->length; // separate FCS/CRC
 	    }
 
-	    call Leds.led1Toggle();
 	    //if (call UartSend.send(uartQueue[uartOut], len) == SUCCESS) {
 	    if (call PppIpv6.transmit(getPayload(msg)+1,
 				      len) == SUCCESS) {
-		//call Leds.led2Toggle();
 		atomic {
 		    if (msg == pppQueue[pppOut]) {
 			if (++pppOut >= PPP_QUEUE_LEN)
@@ -1000,7 +985,6 @@ implementation
 
 //for apps/PPPSniffer
 #ifdef PPPSNIFFER
-		call Leds.led0Toggle();
 		atomic {
 		    if (!pppFull) {
 			//ret = pppQueue[pppIn];

@@ -35,7 +35,7 @@
 generic module nullAppP(process_t process_id) {
 provides interface SplitControl;
 
-uses interface nullAppParams;
+uses interface Param;
 
 uses interface AMSend as SubAMSend;
 uses interface Receive as SubReceive;
@@ -47,6 +47,7 @@ uses interface PacketAcknowledgements as SubPacketAcknowledgements;
 uses interface PacketField<uint8_t> as SubPacketLinkQuality;
 uses interface PacketField<uint8_t> as SubPacketTransmitPower;
 uses interface PacketField<uint8_t> as SubPacketRSSI;
+uses interface PacketField<uint8_t> as SubPacketTimeSyncOffset;
 }
 
 implementation {
@@ -71,6 +72,10 @@ event message_t* SubReceive.receive(message_t *msg, void* payload, uint8_t len) 
 
 event message_t* SubSnoop.receive(message_t *msg, void* payload, uint8_t len) {
 	return msg;
+}
+
+event void Param.updated(uint8_t var_id, bool conflict) {
+
 }
 
 }

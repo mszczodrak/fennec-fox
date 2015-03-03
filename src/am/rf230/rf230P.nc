@@ -40,8 +40,7 @@ provides interface AMSend[process_t process_id];
 provides interface Receive[process_t process_id];
 provides interface Receive as Snoop[process_t process_id];
 
-uses interface rf230Params;
-uses interface StdControl as RadioParamsControl;
+uses interface Param;
 uses interface StdControl as AMQueueControl;
 uses interface SplitControl as SubSplitControl;
 uses interface LowPowerListening;
@@ -56,35 +55,39 @@ uses interface Packet;
 uses interface Receive as SubReceive[process_t process_id];
 uses interface Receive as SubSnoop[process_t process_id];
 
-
 }
 
 implementation {
+
+uint8_t channel;
+uint8_t power;
+uint16_t sleepInterval;
 	
 command error_t SplitControl.start() {
-	call RadioParamsControl.start();
 	return call SubSplitControl.start();
 }
 
 command error_t SplitControl.stop() {
-	call RadioParamsControl.stop();
 	return call SubSplitControl.stop();
 }
 
 task void setChannel() {
-	if (call RadioChannel.getChannel() == call rf230Params.get_channel()) {
+	call Param.get(CHANNEL, &channel, sizeof(channel));
+	if (call RadioChannel.getChannel() == channel) {
 		return;
 	}
 
-	if (call RadioChannel.setChannel(call rf230Params.get_channel()) != SUCCESS) {
+	if (call RadioChannel.setChannel(channel) != SUCCESS) {
 		post setChannel();
 	}
 }
 
 event void SubSplitControl.startDone(error_t error) {
+	call Param.get(SLEEPINTERVAL, &sleepInterval, sizeof(sleepInterval));
+
 	if (error == SUCCESS) {
 		call AMQueueControl.start();
-        	call LowPowerListening.setLocalWakeupInterval(call rf230Params.get_sleepInterval());
+        	call LowPowerListening.setLocalWakeupInterval(sleepInterval);
 	}
 
 	post setChannel();
@@ -101,8 +104,11 @@ event void SubSplitControl.stopDone(error_t error) {
 }
 
 command error_t AMSend.send[am_id_t id](am_addr_t addr, message_t* msg, uint8_t len) {
-	call LowPowerListening.setRemoteWakeupInterval(msg, call rf230Params.get_sleepInterval());
-	call PacketTransmitPower.set(msg, call rf230Params.get_power());
+	call Param.get(POWER, &power, sizeof(power));
+	call Param.get(SLEEPINTERVAL, &sleepInterval, sizeof(sleepInterval));
+
+	call LowPowerListening.setRemoteWakeupInterval(msg, sleepInterval);
+	call PacketTransmitPower.set(msg, power);
 	return call SubAMSend.send[id](addr, msg, len);
 }
 
@@ -123,17 +129,17 @@ command void* AMSend.getPayload[am_id_t id](message_t* msg, uint8_t len) {
 }
 
 event message_t * SubReceive.receive[process_t id](message_t* msg, void* payload, uint8_t len) {
-	if (!validProcessId(call AMPacket.type(msg))) {
+	if (!validProcessId(call AMPacket.group(msg))) {
 		return msg;
 	}
-	return signal Receive.receive[id](msg, payload, len);
+	return signal Receive.receive[LOW_PROC_ID(call AMPacket.group(msg))](msg, payload, len);
 }
 
 event message_t * SubSnoop.receive[process_t id](message_t* msg, void* payload, uint8_t len) {
-	if (!validProcessId(call AMPacket.type(msg))) {
+	if (!validProcessId(call AMPacket.group(msg))) {
 		return msg;
 	}
-	return signal Snoop.receive[id](msg, payload, len);
+	return signal Snoop.receive[LOW_PROC_ID(call AMPacket.group(msg))](msg, payload, len);
 }
 
 

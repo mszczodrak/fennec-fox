@@ -45,6 +45,7 @@ uses interface Boot;
 uses interface Leds;
 uses interface SplitControl;
 uses interface Random;
+uses interface FennecData;
 
 uses interface SerialDbgs;
 }
@@ -58,6 +59,7 @@ norace event_t event_mask;
 norace state_t next_state = 0;
 norace uint16_t next_seq = 0;
 norace bool state_transitioning = TRUE;
+uint8_t invalid_process = 0;
 
 task void check_event() {
 	uint8_t i;
@@ -70,51 +72,54 @@ task void check_event() {
 }
 
 task void stop_state() {
+#ifdef __DBGS__FENNEC__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[-] FennecP Stop State: %u Sequence: %u\n", current_state, current_seq);
+#else
 	call SerialDbgs.dbgs(DBGS_STOP, 0, current_state, current_seq);
+#endif
+#endif
 	call SplitControl.stop();
 }
 
 task void start_state() {
+#ifdef __DBGS__FENNEC__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[-] FennecP Start State: %u Sequence: %u\n", current_state, current_seq);
+#else
 	call SerialDbgs.dbgs(DBGS_START, 0, current_state, current_seq);
+#endif
+#endif
 	call SplitControl.start();
 }
 
 task void stop_done() {
+#ifdef __DBGS__FENNEC__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[-] FennecP StopDone State: %u Sequence: %u\n", current_state, current_seq);
+#else
 	call SerialDbgs.dbgs(DBGS_STOP_DONE, 0, current_state, current_seq);
+#endif
+#endif
 	event_mask = 0;
 	current_state = next_state;
 	current_seq = next_seq;
-	//printf("Fennec Reconfiguration        v %d                -> %d\n", next_seq, next_state);
 	post start_state();
 }
 
 task void start_done() {
+#ifdef __DBGS__FENNEC__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[-] FennecP StartDone State: %u Sequence: %u\n", current_state, current_seq);
+#else
 	call SerialDbgs.dbgs(DBGS_START_DONE, 0, current_state, current_seq);
+#endif
+#endif
 	state_transitioning = FALSE;
 }
 
 task void send_state_update() {
 	signal FennecState.resend();
-}
-
-bool validProcessId(process_t process_id) @C() {
-	struct network_process **npr;
-
-	for(npr = daemon_processes; (*npr) != NULL ; npr++) {
-		if ((*npr)->process_id == process_id) {
-			return TRUE;
-		}
-	}
-
-	for(npr = states[current_state].processes; (*npr) != NULL ; npr++) {
-		if ((*npr)->process_id == process_id) {
-			return TRUE;
-		}
-	}
-
-	/* we should report it */
-	post send_state_update();	
-	return FALSE;
 }
 
 event void Boot.booted() {
@@ -129,6 +134,7 @@ event void Boot.booted() {
 
 event void SplitControl.startDone(error_t err) {
 	event_mask = 0;
+	invalid_process = 0;
 	post start_done();
 }
 
@@ -152,8 +158,18 @@ command void Event.report(process_t process, uint8_t status) {
 	}
 
 	if (status) {
+#ifdef __DBGS__FENNEC__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+		printf("[-] FennecP Event %u ON\n", event_id);
+#endif
+#endif
 		event_mask |= (1 << event_id);
 	} else {
+#ifdef __DBGS__FENNEC__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+		printf("[-] FennecP Event %u OFF\n", event_id);
+#endif
+#endif
 		event_mask &= ~(1 << event_id);
 	}
 	post check_event();
@@ -188,6 +204,36 @@ command module_t Fennec.getModuleId(process_t process_id, layer_t layer) {
 		return UNKNOWN;
 	}
 }
+
+async command process_t Fennec.getProcessIdFromAM(module_t am_module_id) {
+	struct network_process **npr;
+	process_t process_id = UNKNOWN;
+
+	for (npr = states[current_state].processes; (*npr) != NULL; npr++) {
+		if ((*npr)->am_module == am_module_id) {
+			if ((*npr)->am_dominant) {
+				return (*npr)->process_id;
+			}
+			process_id = (*npr)->process_id;
+		}
+	}
+
+	if (process_id != UNKNOWN) {
+		return process_id;
+	}
+
+	for (npr = daemon_processes; (*npr) != NULL; npr++) {
+		if ((*npr)->am_module == am_module_id) {
+			if ((*npr)->am_dominant) {
+				return (*npr)->process_id;
+			}
+			process_id = (*npr)->process_id;
+		}
+	}
+
+	return process_id;
+}
+
 
 /** FennecState Interface **/
 
@@ -250,7 +296,9 @@ command error_t FennecState.setStateAndSeq(state_t new_state, uint16_t new_seq) 
 
 	/* Network State sequnce has increased */
 	if ((check_sequence(new_seq, current_seq) > 0) && (new_state == current_state)) {
-		current_seq = new_seq;
+		next_state = new_state;
+		next_seq = new_seq;
+		state_transitioning = TRUE;
 		signal FennecState.resend();
 		return SUCCESS;
 	}
@@ -285,23 +333,46 @@ command void FennecState.resendDone(error_t error) {
 	}
 }
 
-async command process_t Fennec.getProcessIdFromAM(module_t am_module_id) {
-	struct network_process **npr;
-	process_t process_id = UNKNOWN;
-	for (npr = states[current_state].processes; (*npr) != NULL; npr++) {
-		if ((*npr)->am_module == am_module_id) {
-			if (!(*npr)->am_level) {
-				return (*npr)->process_id;
-			}
-			process_id = (*npr)->process_id;
-		}
-	}
-	return process_id;
-}
-
 default event void FennecState.resend() {}
 
+/** 
+	Global C-like functions - part of ff_functions 
+*/
+
+bool validProcessId(nx_uint8_t msg_type) @C() {
+	struct network_process **npr;
+
+	call FennecData.checkDataSeq(msg_type);
+
+	for(npr = daemon_processes; (*npr) != NULL ; npr++) {
+		if (((*npr)->process_id) == LOW_PROC_ID(msg_type)) {
+			return TRUE;
+		}
+	}
+
+	for(npr = states[current_state].processes; (*npr) != NULL ; npr++) {
+		if (((*npr)->process_id) == LOW_PROC_ID(msg_type)) {
+			return TRUE;
+		}
+	}
+
+	/* we should report it */
+	if (++invalid_process > REPORT_INVALID_PROCESS) {
+		post send_state_update();	
+		invalid_process = 0;
+	}
+	return FALSE;
 }
 
+nx_uint8_t setFennecType(nx_uint8_t id) @C() {
+	nx_uint8_t newType;
+	newType = id << 4;
+	//newType += LOW_DATA_ID(call FennecData.getDataSeq());
+	newType += LOW_DATA_ID(call FennecData.getDataCrc());
+	return newType;
+}
 
+event void FennecData.updated(uint8_t global_id, uint8_t var_index) {}
+event void FennecData.resend() {}
 
+}

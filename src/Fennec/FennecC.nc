@@ -39,6 +39,8 @@ configuration FennecC {
 provides interface Fennec;
 provides interface Event;
 provides interface FennecState;
+provides interface FennecData;
+provides interface Param[process_t process, uint8_t layer];
 }
 
 implementation {
@@ -48,6 +50,7 @@ components FennecP;
 components LedsC;
 components NetworkStateC;
 components RandomC;
+components FennecCacheP;
 
 Fennec = FennecP;
 FennecState = FennecP;
@@ -57,6 +60,13 @@ FennecP.Boot -> MainC;
 FennecP.Leds -> LedsC;
 FennecP.SplitControl -> NetworkStateC;
 FennecP.Random -> RandomC;
+FennecP.FennecData -> FennecCacheP;
+
+FennecData = FennecCacheP;
+Param = FennecCacheP;
+FennecCacheP.Boot -> MainC;
+FennecCacheP.Random -> RandomC;
+FennecCacheP.Fennec -> FennecP;
 
 #ifdef FENNEC_TOS_PRINTF
 components PrintfC;
@@ -75,6 +85,7 @@ components SerialStartC;
 
 components SerialDbgsC;
 FennecP.SerialDbgs -> SerialDbgsC.SerialDbgs[250];
+FennecCacheP.SerialDbgs -> SerialDbgsC.SerialDbgs[250];
 
 }
 

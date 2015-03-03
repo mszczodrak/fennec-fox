@@ -42,12 +42,13 @@ provides interface Packet;
 provides interface PacketAcknowledgements;
 provides interface LinkPacketMetadata;
 
-uses interface nullAMParams;
+uses interface Param;
 uses interface StdControl as AMQueueControl;
 
 provides interface PacketField<uint8_t> as PacketLinkQuality;
 provides interface PacketField<uint8_t> as PacketTransmitPower;
 provides interface PacketField<uint8_t> as PacketRSSI;
+provides interface PacketField<uint8_t> as PacketTimeSyncOffset;
 
 provides interface LowPowerListening;
 provides interface RadioChannel;
@@ -65,7 +66,7 @@ implementation {
 
 components nullAMP;
 
-nullAMParams = nullAMP;
+Param = nullAMP;
 SplitControl = nullAMP.SplitControl;
 
 LowPowerListening = nullAMP;
@@ -86,14 +87,11 @@ AMQueueControl = nullAMP.AMQueueControl;
 PacketLinkQuality = nullAMP.PacketLinkQuality;
 PacketTransmitPower = nullAMP.PacketTransmitPower;
 PacketRSSI = nullAMP.PacketRSSI;
-
-
+PacketTimeSyncOffset = nullAMP.PacketTimeSyncOffset;
 
 PacketTimeStampRadio = UnimplementedPacketTimeStampRadio;
 PacketTimeStampMilli = UnimplementedPacketTimeStampMilli;
 PacketTimeStamp32khz = UnimplementedPacketTimeStamp32khz;
-
-
 
 }
 

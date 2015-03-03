@@ -34,7 +34,7 @@
 generic configuration timerSecondC(process_t process) {
 provides interface SplitControl;
 
-uses interface timerSecondParams;
+uses interface Param;
 
 uses interface AMSend as SubAMSend;
 uses interface Receive as SubReceive;
@@ -46,6 +46,7 @@ uses interface PacketAcknowledgements as SubPacketAcknowledgements;
 uses interface PacketField<uint8_t> as SubPacketLinkQuality;
 uses interface PacketField<uint8_t> as SubPacketTransmitPower;
 uses interface PacketField<uint8_t> as SubPacketRSSI;
+uses interface PacketField<uint8_t> as SubPacketTimeSyncOffset;
 
 uses interface Event;
 }
@@ -54,7 +55,7 @@ implementation {
 components new timerSecondP(process);
 SplitControl = timerSecondP;
 
-timerSecondParams = timerSecondP;
+Param = timerSecondP;
 
 SubAMSend = timerSecondP.SubAMSend;
 SubReceive = timerSecondP.SubReceive;
@@ -62,14 +63,21 @@ SubSnoop = timerSecondP.SubSnoop;
 SubAMPacket = timerSecondP.SubAMPacket;
 SubPacket = timerSecondP.SubPacket;
 SubPacketAcknowledgements = timerSecondP.SubPacketAcknowledgements;
-SubStatus = timerSecondP.SubStatus;
 
 SubPacketLinkQuality = timerSecondP.SubPacketLinkQuality;
 SubPacketTransmitPower = timerSecondP.SubPacketTransmitPower;
 SubPacketRSSI = timerSecondP.SubPacketRSSI;
+SubPacketTimeSyncOffset = timerSecondP.SubPacketTimeSyncOffset;
 
 Event = timerSecondP;
 
 components new TimerMilliC();
 timerSecondP.Timer -> TimerMilliC;
+
+components SerialDbgsC;
+timerSecondP.SerialDbgs -> SerialDbgsC.SerialDbgs[process];
+
+components LocalTime32khzC;
+timerSecondP.LocalTime -> LocalTime32khzC;
+
 }

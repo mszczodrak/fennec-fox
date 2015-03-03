@@ -37,7 +37,7 @@
 generic module BlinkP(process_t process) {
 provides interface SplitControl;
 
-uses interface BlinkParams;
+uses interface Param;
 
 uses interface AMSend as SubAMSend;
 uses interface Receive as SubReceive;
@@ -49,31 +49,67 @@ uses interface PacketAcknowledgements as SubPacketAcknowledgements;
 uses interface PacketField<uint8_t> as SubPacketLinkQuality;
 uses interface PacketField<uint8_t> as SubPacketTransmitPower;
 uses interface PacketField<uint8_t> as SubPacketRSSI;
+uses interface PacketField<uint8_t> as SubPacketTimeSyncOffset;
 
 uses interface Leds;
 uses interface Timer<TMilli> as Timer;
+
+uses interface SerialDbgs;
 }
 
 implementation {
 bool on;
+uint16_t delay;
+uint8_t led;
 
 command error_t SplitControl.start() {
 	on = 0;
-	call Timer.startPeriodic(call BlinkParams.get_delay());
+	call Param.get(DELAY, &delay, sizeof(delay));
+	call Param.get(LED, &led, sizeof(led));
+
+#ifdef __DBGS__APPLICATION__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[%u] Application Blink start()\n", process);
+#else
+	call SerialDbgs.dbgs(DBGS_MGMT_START, process, 0, 0);
+#endif
+#endif
+	
+	call Timer.startPeriodic(delay);
 	signal SplitControl.startDone(SUCCESS);
 	return SUCCESS;
 }
 
 command error_t SplitControl.stop() {
 	call Timer.stop();
+#ifdef __USUAL_LEDS__
 	call Leds.set(0);
+#endif
+
+#ifdef __DBGS__APPLICATION__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[%u] Application Blink stop()\n", process);
+#else
+	call SerialDbgs.dbgs(DBGS_MGMT_STOP, process, 0, 0);
+#endif
+#endif
 	signal SplitControl.stopDone(SUCCESS);
 	return SUCCESS;
 }
 
 event void Timer.fired() {
-	on ? call Leds.set(0) : call Leds.set(call BlinkParams.get_led()) ;
+#ifdef __USUAL_LEDS__
+	on ? call Leds.set(0) : call Leds.set(led) ;
+#endif
 	on = !on;
+#ifdef __DBGS__APPLICATION__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[%u] Application Blink LED #%d -> %d\n", process, led, on);
+#else
+	call SerialDbgs.dbgs(DBGS_LED_ON, process, led, on);
+#endif
+#endif
+
 }
 
 event void SubAMSend.sendDone(message_t *msg, error_t error) {}
@@ -84,6 +120,10 @@ event message_t* SubReceive.receive(message_t *msg, void* payload, uint8_t len) 
 
 event message_t* SubSnoop.receive(message_t *msg, void* payload, uint8_t len) {
 	return msg;
+}
+
+event void Param.updated(uint8_t var_id) {
+
 }
 
 }

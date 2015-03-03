@@ -44,7 +44,7 @@ provides interface PacketField<uint8_t> as PacketLinkQuality;
 provides interface PacketField<uint8_t> as PacketTransmitPower;
 provides interface PacketField<uint8_t> as PacketRSSI;
 
-uses interface nullNetParams;
+uses interface Param;
 
 uses interface AMSend as SubAMSend;
 uses interface Receive as SubReceive;
@@ -60,13 +60,15 @@ uses interface PacketField<uint8_t> as SubPacketLinkQuality;
 uses interface PacketField<uint8_t> as SubPacketTransmitPower;
 uses interface PacketField<uint8_t> as SubPacketRSSI;
 
+uses interface PacketTimeStamp<TMilli, uint32_t> as SubPacketTimeStampMilli;
+uses interface PacketTimeStamp<T32khz, uint32_t> as SubPacketTimeStamp32khz;
 }
 
 implementation {
 
 components new nullNetP(process);
 SplitControl = nullNetP;
-nullNetParams = nullNetP;
+Param = nullNetP;
 AMSend = nullNetP.AMSend;
 Receive = nullNetP.Receive;
 Snoop = nullNetP.Snoop;
@@ -87,4 +89,7 @@ RadioChannel = nullNetP.RadioChannel;
 PacketLinkQuality = SubPacketLinkQuality;
 PacketTransmitPower = SubPacketTransmitPower;
 PacketRSSI = SubPacketRSSI;
+
+SubPacketTimeStampMilli = nullNetP.SubPacketTimeStampMilli;
+SubPacketTimeStamp32khz = nullNetP.SubPacketTimeStamp32khz;
 }

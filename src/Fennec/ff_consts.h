@@ -46,6 +46,7 @@ enum {
 	SEQ_OFFSET		= 1,
 	SEQ_OVERLAP		= 10,
 	SEQ_MAX			= 0xFFDC,
+	VARIABLE_HISTORY	= 11,
 
         UNKNOWN                 = 0xFF,
 	NODE			= 0xFFFA,
@@ -58,6 +59,10 @@ enum {
         UNKNOWN_CONFIGURATION   = 0xFFF9,
         UNKNOWN_LAYER           = 255,
 	UNKNOWN_ID		= 0xFFF0,
+
+	SECOND_TO_MILLI		= 1024,
+	MINUTE_TO_SECOND	= 60,
+	HOUR_TO_MINUTE		= 60
 
 };
 

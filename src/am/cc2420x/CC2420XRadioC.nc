@@ -281,8 +281,10 @@ implementation
 	RadioDriverLayerC.RadioAlarm -> RadioAlarmC.RadioAlarm[unique(UQ_RADIO_ALARM)];
 	RadioDriverLayerC.Tasklet -> TaskletC;
 
+	components SerialDbgsC;
+	CollisionAvoidanceLayerC.SerialDbgs -> SerialDbgsC.SerialDbgs[242];
+	SoftwareAckLayerC.SerialDbgs -> SerialDbgsC.SerialDbgs[242];
+	LowPowerListeningLayerC.SerialDbgs -> SerialDbgsC.SerialDbgs[242];
+	//LowPowerListeningLayerC.LocalTime -> RadioDriverLayerC;
 
-components SerialDbgsC;
-CollisionAvoidanceLayerC.SerialDbgs -> SerialDbgsC.SerialDbgs[212];
-SoftwareAckLayerC.SerialDbgs -> SerialDbgsC.SerialDbgs[212];
 }

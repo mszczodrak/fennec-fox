@@ -37,7 +37,7 @@
 generic configuration CounterC(process_t process) {
 provides interface SplitControl;
 
-uses interface CounterParams;
+uses interface Param;
 
 uses interface AMSend as SubAMSend;
 uses interface Receive as SubReceive;
@@ -49,6 +49,7 @@ uses interface PacketAcknowledgements as SubPacketAcknowledgements;
 uses interface PacketField<uint8_t> as SubPacketLinkQuality;
 uses interface PacketField<uint8_t> as SubPacketTransmitPower;
 uses interface PacketField<uint8_t> as SubPacketRSSI;
+uses interface PacketField<uint8_t> as SubPacketTimeSyncOffset;
 }
 
 implementation {
@@ -56,7 +57,7 @@ implementation {
 components new CounterP(process);
 SplitControl = CounterP;
 
-CounterParams = CounterP;
+Param = CounterP;
 
 SubAMSend = CounterP.SubAMSend;
 SubReceive = CounterP.SubReceive;
@@ -68,6 +69,7 @@ SubPacketAcknowledgements = CounterP.SubPacketAcknowledgements;
 SubPacketLinkQuality = CounterP.SubPacketLinkQuality;
 SubPacketTransmitPower = CounterP.SubPacketTransmitPower;
 SubPacketRSSI = CounterP.SubPacketRSSI;
+SubPacketTimeSyncOffset = CounterP.SubPacketTimeSyncOffset;
 
 components LedsC;
 components new TimerMilliC();

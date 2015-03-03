@@ -43,7 +43,7 @@ provides interface Packet;
 provides interface PacketAcknowledgements;
 provides interface LinkPacketMetadata;
 
-uses interface rf212Params;
+uses interface Param;
 uses interface StdControl as AMQueueControl;
 
 provides interface PacketField<uint8_t> as PacketLinkQuality;
@@ -66,15 +66,12 @@ components rf212P;
 components RF212ActiveMessageC as AM;
 components RF212RadioP as RadioP;
 
-rf212Params = rf212P;
-rf212Params = RadioP.rf212Params;
+Param = rf212P;
 SplitControl = rf212P.SplitControl;
 AMQueueControl = rf212P.AMQueueControl;
 AMSend = rf212P.AMSend;
 Receive = rf212P.Receive;
 Snoop = rf212P.Snoop;
-
-rf212P.RadioParamsControl -> RadioP.StdControl;
 
 rf212P.SubSplitControl -> AM.SplitControl;
 rf212P.PacketTransmitPower -> AM.PacketTransmitPower;
@@ -99,12 +96,5 @@ LinkPacketMetadata = AM.LinkPacketMetadata;
 PacketLinkQuality = AM.PacketLinkQuality;
 PacketTransmitPower = AM.PacketTransmitPower;
 PacketRSSI = AM.PacketRSSI;
-
-#ifdef __DBGS__
-components RF212DriverLayerP;
-components SerialDbgsC;
-RF212DriverLayerP.SerialDbgs -> SerialDbgsC.SerialDbgs[212];
-#endif
-
 
 }

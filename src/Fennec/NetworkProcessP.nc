@@ -34,7 +34,6 @@
 
 #include "Fennec.h"
 #include "ff_caches.h"
-#include "ff_defaults.h"
 
 #define MODULE_RESPONSE_DELAY    200
 
@@ -114,6 +113,18 @@ command error_t NetworkProcess.stop(process_t process_id) {
 
 event void ModuleCtrl.startDone(error_t error) {
 	dbg("NetworkProcess", "[-] NetworkProcess ModuleCtrl.startDone(%d)\n", error);
+
+	if (state != S_STARTING) {
+#ifdef __DBGS__FENNEC__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+		printf("[-] NetworkProcess in state %u got stopDone from process %u layer %u\n",
+			state, current_process, current_layer);
+#endif
+#endif
+		signal NetworkProcess.stopDone(FAIL);
+		return;
+	}
+
 	if ((error == SUCCESS) || (error = EALREADY)) {
 		call Timer.stop();
 		next_layer();
@@ -129,6 +140,18 @@ event void ModuleCtrl.startDone(error_t error) {
 
 event void ModuleCtrl.stopDone(error_t error) {
 	dbg("NetworkProcess", "[-] NetworkProcess ModuleCtrl.stopDone(%d)\n", error);
+
+	if (state != S_STOPPING) {
+#ifdef __DBGS__FENNEC__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+		printf("[-] NetworkProcess in state %u got stopDone from process %u layer %u\n",
+			state, current_process, current_layer);
+#endif
+#endif
+		signal NetworkProcess.startDone(FAIL);
+		return;
+	}
+
 	if ((error == SUCCESS) || (error = EALREADY)) {
 		call Timer.stop();
 		next_layer();

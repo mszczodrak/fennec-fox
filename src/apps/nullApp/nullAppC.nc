@@ -35,7 +35,7 @@
 generic configuration nullAppC(process_t process_id) {
 provides interface SplitControl;
 
-uses interface nullAppParams;
+uses interface Param;
 
 uses interface AMSend as SubAMSend;
 uses interface Receive as SubReceive;
@@ -47,13 +47,14 @@ uses interface PacketAcknowledgements as SubPacketAcknowledgements;
 uses interface PacketField<uint8_t> as SubPacketLinkQuality;
 uses interface PacketField<uint8_t> as SubPacketTransmitPower;
 uses interface PacketField<uint8_t> as SubPacketRSSI;
+uses interface PacketField<uint8_t> as SubPacketTimeSyncOffset;
 }
 
 implementation {
 components new nullAppP(process_id);
 SplitControl = nullAppP;
 
-nullAppParams = nullAppP;
+Param = nullAppP;
 
 SubAMSend = nullAppP.SubAMSend;
 SubReceive = nullAppP.SubReceive;
@@ -65,4 +66,5 @@ SubPacketAcknowledgements = nullAppP.SubPacketAcknowledgements;
 SubPacketLinkQuality = nullAppP.SubPacketLinkQuality;
 SubPacketTransmitPower = nullAppP.SubPacketTransmitPower;
 SubPacketRSSI = nullAppP.SubPacketRSSI;
+SubPacketTimeSyncOffset = nullAppP.SubPacketTimeSyncOffset;
 }

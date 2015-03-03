@@ -104,7 +104,7 @@
 #include <CtpForwardingEngine.h>
 #include <CtpDebugMsg.h>
    
-generic module CtpForwardingEngineP() {
+generic module CtpForwardingEngineP(process_t process) {
   provides {
     interface Init;
     interface StdControl;
@@ -161,6 +161,7 @@ generic module CtpForwardingEngineP() {
     // as appropriate.
     interface SplitControl as RadioControl;
   }
+	uses interface SerialDbgs;
 }
 implementation {
   /* Helper functions to start the given timer with a random number
@@ -220,14 +221,44 @@ implementation {
   }
 
   command error_t StdControl.start() {
-    call Init.init();
     setState(ROUTING_ON);
     return SUCCESS;
   }
 
+  void packetComplete(fe_queue_entry_t* qe, message_t* msg, bool success);
+
   command error_t StdControl.stop() {
-    forwardingState = 0;
     clearState(ROUTING_ON);
+    clearState(SENDING);
+    call RetxmitTimer.stop();
+
+    if (! call SendQueue.empty() ) {
+
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+        printf("[%u] CTP Stop without sending all messages to %u\n",
+                process, call UnicastNameFreeRouting.nextHop());
+#else
+        call SerialDbgs.dbgs(DBGS_GOT_SEND_FURTHER_SEND_FAIL, call SendQueue.size(),
+                                call MessagePool.maxSize() - call MessagePool.size(), 
+				call UnicastNameFreeRouting.nextHop());
+#endif
+#endif
+    }
+
+    while (!call SendQueue.empty()) {
+       fe_queue_entry_t *qe = call SendQueue.head();  
+       if (qe->client < CLIENT_COUNT) {
+          clientPtrs[qe->client] = qe;
+          signal Send.sendDone[qe->client](qe->msg, FAIL);
+       }
+       call MessagePool.put(qe->msg);
+       call QEntryPool.put(qe);
+       call SendQueue.dequeue();
+    }
+
+    call SentCache.flush();
+
     return SUCCESS;
   }
 
@@ -413,7 +444,17 @@ implementation {
 	  call CollectionDebug.logEvent(NET_C_FE_PUT_MSGPOOL_ERR); 
 	if (call QEntryPool.put(qe) != SUCCESS) 
 	  call CollectionDebug.logEvent(NET_C_FE_PUT_QEPOOL_ERR); 
-	  
+	 
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+        printf("[%u] CTP sendTask duplicate in SentCache - drop msg from %u\n",
+		process, getHeader(qe->msg)->origin);
+#else
+        call SerialDbgs.dbgs(DBGS_GOT_SEND_DUPLICATE, call CollectionPacket.getSequenceNumber(qe->msg), 
+				getHeader(qe->msg)->origin, call UnicastNameFreeRouting.nextHop());
+#endif
+#endif
+ 
         post sendTask();
         return;
       }
@@ -450,10 +491,18 @@ implementation {
 	}
 	
 	subsendResult = call SubSend.send(dest, qe->msg, payloadLen);
+
 	if (subsendResult == SUCCESS) {
 	  // Successfully submitted to the data-link layer.
 	  setState(SENDING);
 	  dbg("Forwarder", "%s: subsend succeeded with %p.\n", __FUNCTION__, qe->msg);
+
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+        printf("[%u] CTP sendTask ok for msg from %u, next to %u\n", 
+		process, getHeader(qe->msg)->origin, dest);
+#endif
+#endif
 	  return;
 	}
 	// The packet is too big: truncate it and retry.
@@ -462,9 +511,23 @@ implementation {
 	  call Packet.setPayloadLength(qe->msg, call Packet.maxPayloadLength());
 	  post sendTask();
 	  call CollectionDebug.logEvent(NET_C_FE_SUBSEND_SIZE);
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+        printf("[%u] CTP sendTask too big msg from %u, next to %u\n", process, getHeader(qe->msg)->origin, dest);
+#endif
+#endif
 	}
 	else {
 	  dbg("Forwarder", "%s: subsend failed from %i\n", __FUNCTION__, (int)subsendResult);
+
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+        printf("[%u] CTP sendTask FAIL for msg from %u, next to %u\n", process, getHeader(qe->msg)->origin, dest);
+#else
+        call SerialDbgs.dbgs(DBGS_GOT_SEND_STATE_FAIL, call CollectionPacket.getSequenceNumber(qe->msg), 
+					getHeader(qe->msg)->origin, dest);
+#endif
+#endif
 	}
       }
     }
@@ -530,6 +593,10 @@ implementation {
     fe_queue_entry_t *qe = call SendQueue.head();
     dbg("Forwarder", "%s to %hu and %hhu\n", __FUNCTION__, call AMPacket.destination(msg), error);
 
+    if (!hasState(ROUTING_ON)) {
+       return;
+    }
+
     if (error != SUCCESS) {
       /* The radio wasn't able to send the packet: retransmit it. */
       dbg("Forwarder", "%s: send failed\n", __FUNCTION__);
@@ -538,6 +605,13 @@ implementation {
 				       call CollectionPacket.getOrigin(msg), 
 				       call AMPacket.destination(msg));
       startRetxmitTimer(SENDDONE_FAIL_WINDOW, SENDDONE_FAIL_OFFSET);
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+        printf("[%u] CTP sendDone != SUCCESS for msg from %u, next hop %u\n", process, getHeader(msg)->origin,
+		call UnicastNameFreeRouting.nextHop());
+#endif
+#endif
+
     }
     else if (hasState(ACK_PENDING) && !call PacketAcknowledgements.wasAcked(msg)) {
       /* No ack: if countdown is not 0, retransmit, else drop the packet. */
@@ -550,11 +624,26 @@ implementation {
 					 call CollectionPacket.getOrigin(msg), 
                                          call AMPacket.destination(msg));
         startRetxmitTimer(SENDDONE_NOACK_WINDOW, SENDDONE_NOACK_OFFSET);
+
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+        printf("[%u] CTP missed ACK, retry for msg from %u with THL %u\n", process, getHeader(msg)->origin, call CtpPacket.getThl(msg));
+#endif
+#endif
       } else {
 	/* Hit max retransmit threshold: drop the packet. */
 	call SendQueue.dequeue();
         clearState(SENDING);
         startRetxmitTimer(SENDDONE_OK_WINDOW, SENDDONE_OK_OFFSET);
+
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+        printf("[%u] CTP missed ACK, drop msg from %u\n", process, getHeader(msg)->origin);
+#else
+        call SerialDbgs.dbgs(DBGS_GOT_SEND_NO_ACK, call CollectionPacket.getSequenceNumber(msg),
+                                         call CollectionPacket.getOrigin(msg), call UnicastNameFreeRouting.nextHop());
+#endif
+#endif
 	
 	packetComplete(qe, msg, FALSE);
       }
@@ -568,6 +657,12 @@ implementation {
       startRetxmitTimer(SENDDONE_OK_WINDOW, SENDDONE_OK_OFFSET);
       call LinkEstimator.txAck(call AMPacket.destination(msg));
       packetComplete(qe, msg, TRUE);
+
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[%u] CTP sendDone SUCCESS for msg from %u with THL %u\n", process, getHeader(msg)->origin, call CtpPacket.getThl(msg));
+#endif
+#endif
     }
   }
 
@@ -577,87 +672,117 @@ implementation {
    * message in the pool, it returns the passed message and does not
    * put it on the send queue.
    */
-  message_t* ONE forward(message_t* ONE m) {
-    if (call MessagePool.empty()) {
-      dbg("Route", "%s cannot forward, message pool empty.\n", __FUNCTION__);
-      // send a debug message to the uart
-      call CollectionDebug.logEvent(NET_C_FE_MSG_POOL_EMPTY);
-    }
-    else if (call QEntryPool.empty()) {
-      dbg("Route", "%s cannot forward, queue entry pool empty.\n", 
-          __FUNCTION__);
-      // send a debug message to the uart
-      call CollectionDebug.logEvent(NET_C_FE_QENTRY_POOL_EMPTY);
-    }
-    else {
-      message_t* newMsg;
-      fe_queue_entry_t *qe;
-      uint16_t gradient;
+message_t* ONE forward(message_t* ONE m) {
+	if (call MessagePool.empty()) {
+		// send a debug message to the uart
+		call CollectionDebug.logEvent(NET_C_FE_MSG_POOL_EMPTY);
+
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+        	printf("[%u] CTP problem - drop msg from %u\n", process, getHeader(m)->origin);
+#else
+	        call SerialDbgs.dbgs(DBGS_GOT_SEND_FULL_QUEUE_FAIL, call CollectionPacket.getSequenceNumber(m),
+                                         call CollectionPacket.getOrigin(m), 1);
+#endif
+#endif
+
+	} else 
+		if (call QEntryPool.empty()) {
+			// send a debug message to the uart
+			call CollectionDebug.logEvent(NET_C_FE_QENTRY_POOL_EMPTY);
+
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+		        printf("[%u] CTP problem - drop msg from %u\n", process, getHeader(m)->origin);
+#else
+		        call SerialDbgs.dbgs(DBGS_GOT_SEND_FULL_QUEUE_FAIL, call CollectionPacket.getSequenceNumber(m),
+                                         call CollectionPacket.getOrigin(m), 2);
+#endif
+#endif
+
+		} else {
+			message_t* newMsg;
+			fe_queue_entry_t *qe;
+			uint16_t gradient;
       
-      qe = call QEntryPool.get();
-      if (qe == NULL) {
-        call CollectionDebug.logEvent(NET_C_FE_GET_MSGPOOL_ERR);
-        return m;
-      }
+			qe = call QEntryPool.get();
+			if (qe == NULL) {
+				call CollectionDebug.logEvent(NET_C_FE_GET_MSGPOOL_ERR);
+				return m;
+			}
 
-      newMsg = call MessagePool.get();
-      if (newMsg == NULL) {
-        call CollectionDebug.logEvent(NET_C_FE_GET_QEPOOL_ERR);
-        return m;
-      }
+			newMsg = call MessagePool.get();
+			if (newMsg == NULL) {
+				call CollectionDebug.logEvent(NET_C_FE_GET_QEPOOL_ERR);
+				return m;
+			}
 
-      memset(newMsg, 0, sizeof(message_t));
-      memset(m->metadata, 0, sizeof(message_metadata_t));
+			memset(newMsg, 0, sizeof(message_t));
+			memset(m->metadata, 0, sizeof(message_metadata_t));
       
-      qe->msg = m;
-      qe->client = 0xff;
-      qe->retries = MAX_RETRIES;
-
+			qe->msg = m;
+			qe->client = 0xff;
+			qe->retries = MAX_RETRIES;
       
-      if (call SendQueue.enqueue(qe) == SUCCESS) {
-        dbg("Forwarder,Route", "%s forwarding packet %p with queue size %hhu\n", __FUNCTION__, m, call SendQueue.size());
-        // Loop-detection code:
-        if (call CtpInfo.getEtx(&gradient) == SUCCESS) {
-          // We only check for loops if we know our own metric
-          if (call CtpPacket.getEtx(m) <= gradient) {
-            // If our etx metric is less than or equal to the etx value
-	    // on the packet (etx of the previous hop node), then we believe
-	    // we are in a loop.
-	    // Trigger a route update and backoff.
-            call CtpInfo.triggerImmediateRouteUpdate();
-            startRetxmitTimer(LOOPY_WINDOW, LOOPY_OFFSET);
-            call CollectionDebug.logEventMsg(NET_C_FE_LOOP_DETECTED,
-					 call CollectionPacket.getSequenceNumber(m), 
-					 call CollectionPacket.getOrigin(m), 
-                                         call AMPacket.destination(m));
-          }
-        }
+			if (call SendQueue.enqueue(qe) == SUCCESS) {
+				dbg("Forwarder,Route", "%s forwarding packet %p with queue size %hhu\n", __FUNCTION__, m, call SendQueue.size());
+				// Loop-detection code:
+				if (call CtpInfo.getEtx(&gradient) == SUCCESS) {
+					// We only check for loops if we know our own metric
+					if (call CtpPacket.getEtx(m) <= gradient) {
+						// If our etx metric is less than or equal to the etx value
+						// on the packet (etx of the previous hop node), then we believe
+						// we are in a loop.
+						// Trigger a route update and backoff.
+						call CtpInfo.triggerImmediateRouteUpdate();
+						startRetxmitTimer(LOOPY_WINDOW, LOOPY_OFFSET);
+						call CollectionDebug.logEventMsg(NET_C_FE_LOOP_DETECTED,
+								call CollectionPacket.getSequenceNumber(m), 
+								call CollectionPacket.getOrigin(m), 
+								call AMPacket.destination(m));
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+						printf("[%u] CTP loop in msg from %u\n", process, getHeader(m)->origin);
+#endif
+#endif
+					}
+				}
 
-        if (!call RetxmitTimer.isRunning()) {
-          // sendTask is only immediately posted if we don't detect a
-          // loop.
-	  dbg("FHangBug", "%s: posted sendTask.\n", __FUNCTION__);
-          post sendTask();
-        }
+				if (!call RetxmitTimer.isRunning()) {
+					// sendTask is only immediately posted if we don't detect a
+					// loop.
+					dbg("FHangBug", "%s: posted sendTask.\n", __FUNCTION__);
+					post sendTask();
+				}
         
-        // Successful function exit point:
-        return newMsg;
-      } else {
-        // There was a problem enqueuing to the send queue.
-        if (call MessagePool.put(newMsg) != SUCCESS)
-          call CollectionDebug.logEvent(NET_C_FE_PUT_MSGPOOL_ERR);
-        if (call QEntryPool.put(qe) != SUCCESS)
-          call CollectionDebug.logEvent(NET_C_FE_PUT_QEPOOL_ERR);
-      }
-    }
+				// Successful function exit point:
+				return newMsg;
+			} else {
+				// There was a problem enqueuing to the send queue.
+				if (call MessagePool.put(newMsg) != SUCCESS)
+					call CollectionDebug.logEvent(NET_C_FE_PUT_MSGPOOL_ERR);
+				if (call QEntryPool.put(qe) != SUCCESS)
+					call CollectionDebug.logEvent(NET_C_FE_PUT_QEPOOL_ERR);
 
-    // NB: at this point, we have a resource acquistion problem.
-    // Log the event, and drop the
-    // packet on the floor.
 
-    call CollectionDebug.logEvent(NET_C_FE_SEND_QUEUE_FULL);
-    return m;
-  }
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+			        printf("[%u] CTP problem - drop msg from %u\n", process, getHeader(m)->origin);
+#else
+			        call SerialDbgs.dbgs(DBGS_GOT_SEND_FULL_QUEUE_FAIL, call CollectionPacket.getSequenceNumber(m),
+                                         call CollectionPacket.getOrigin(m), 3);
+#endif
+#endif
+			}
+	}
+
+	// NB: at this point, we have a resource acquistion problem.
+	// Log the event, and drop the
+	// packet on the floor.
+
+	call CollectionDebug.logEvent(NET_C_FE_SEND_QUEUE_FULL);
+	return m;
+}
  
   /*
    * Received a message to forward. Check whether it is a duplicate by
@@ -670,10 +795,22 @@ implementation {
   event message_t* 
   SubReceive.receive(message_t* msg, void* payload, uint8_t len) {
     collection_id_t collectid;
-    bool duplicate = FALSE;
     fe_queue_entry_t* qe;
     uint8_t i, thl;
 
+    if (!hasState(ROUTING_ON)) {
+       return msg;
+    }
+
+    if (getHeader(msg)->origin > 200) {
+      return msg;
+    }
+
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+        printf("[%u] CTP receive from from %u with THL %u\n", process, getHeader(msg)->origin, call CtpPacket.getThl(msg));
+#endif
+#endif
 
     collectid = call CtpPacket.getType(msg);
 
@@ -691,31 +828,54 @@ implementation {
       return msg;
     }
 
+
     //See if we remember having seen this packet
     //We look in the sent cache ...
-    if (call SentCache.lookup(msg)) {
-        call CollectionDebug.logEvent(NET_C_FE_DUPLICATE_CACHE);
-        return msg;
-    }
     //... and in the queue for duplicates
+
     if (call SendQueue.size() > 0) {
       for (i = call SendQueue.size(); i >0; i--) {
 	qe = call SendQueue.element(i-1);
-	if (call CtpPacket.matchInstance(qe->msg, msg)) {
-	  duplicate = TRUE;
-	  break;
+//	if (call CtpPacket.matchInstance(qe->msg, msg)) {
+	if (call CtpPacket.matchPacket(qe->msg, msg)) {
+           if (call CtpPacket.getThl(qe->msg) > thl) {
+              call CtpPacket.setThl(qe->msg, thl); 
+           }     
+           qe->retries = MAX_RETRIES;
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+        printf("[%u] CTP drop duplicate in SendQueue from %u\n", process, getHeader(msg)->origin);
+#else
+//	call SerialDbgs.dbgs(DBGS_GOT_RECEIVE_DUPLICATE, 0, call CollectionPacket.getOrigin(msg),
+//			call CollectionPacket.getSequenceNumber(msg));
+#endif
+#endif
+          return msg;
 	}
       }
     }
-    
-    if (duplicate) {
-        call CollectionDebug.logEvent(NET_C_FE_DUPLICATE_QUEUE);
+
+    if (call SentCache.lookup(msg)) {
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+        printf("[%u] CTP drop duplicate in SentCache from %u\n", process, getHeader(msg)->origin);
+#else
+//	call SerialDbgs.dbgs(DBGS_GOT_RECEIVE_DUPLICATE, 1, call CollectionPacket.getOrigin(msg),
+//			call CollectionPacket.getSequenceNumber(msg));
+#endif
+#endif
+        call CollectionDebug.logEvent(NET_C_FE_DUPLICATE_CACHE);
         return msg;
     }
 
     // If I'm the root, signal receive. 
     else if (call RootControl.isRoot()) {
       call SentCache.insert(msg);
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+        printf("[%u] CTP receive from %u\n", process, getHeader(msg)->origin);
+#endif
+#endif
       return signal Receive.receive[collectid](msg, 
 					       call Packet.getPayload(msg, call Packet.payloadLength(msg)), 
 					       call Packet.payloadLength(msg));
@@ -728,6 +888,14 @@ implementation {
       return msg;
     else {
       dbg("Route", "Forwarding packet from %hu.\n", getHeader(msg)->origin);
+#ifdef __DBGS__NETWORK_ROUTING__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+        printf("[%u] CTP forward from %u\n", process, getHeader(msg)->origin);
+#else
+	call SerialDbgs.dbgs(DBGS_FORWARDING, call CollectionPacket.getSequenceNumber(msg),
+		call CollectionPacket.getOrigin(msg), call UnicastNameFreeRouting.nextHop());
+#endif
+#endif
       return forward(msg);
     }
   }

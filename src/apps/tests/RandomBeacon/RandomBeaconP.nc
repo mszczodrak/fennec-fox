@@ -40,7 +40,7 @@
 generic module RandomBeaconP(process_t process) {
 provides interface SplitControl;
 
-uses interface RandomBeaconParams;
+uses interface Param;
 
 uses interface AMSend as SubAMSend;
 uses interface Receive as SubReceive;
@@ -61,25 +61,20 @@ uses interface Random;
 
 implementation {
 
-/**
- Available Parameters:
-	uint16_t delay,
-	uint16_t delay_scale,
-*/
-
+uint16_t delay;
+uint16_t delay_scale;
 
 message_t packet;
 bool sendBusy = FALSE;
 
 task void set_timer() {
-	call Timer.startOneShot((call Random.rand32()) % 
-		(call RandomBeaconParams.get_delay() * 
-		call RandomBeaconParams.get_delay_scale()));
+	call Param.get(DELAY, &delay, sizeof(delay));
+	call Param.get(DELAY_SCALE, &delay_scale, sizeof(delay_scale));
+
+	call Timer.startOneShot((call Random.rand32()) % (delay * delay_scale));
 }
 
-
 command error_t SplitControl.start() {
-	//call Leds.led0On();
 	post set_timer();
 	sendBusy = FALSE;
 	signal SplitControl.startDone(SUCCESS);
@@ -95,7 +90,6 @@ command error_t SplitControl.stop() {
 void sendMessage() {
 	RandomBeaconMsg* msg = (RandomBeaconMsg*)call SubAMSend.getPayload(&packet,
 							sizeof(RandomBeaconMsg));
-	call Leds.led1Toggle();
 	if (msg == NULL) {
 		return;
 	}
@@ -107,7 +101,6 @@ void sendMessage() {
 					sizeof(RandomBeaconMsg)) != SUCCESS) {
 	} else {
 		sendBusy = TRUE;
-		call Leds.set(msg->seqno);
 	}
 }
 
@@ -125,7 +118,6 @@ event void SubAMSend.sendDone(message_t *msg, error_t error) {
 
 event message_t* SubReceive.receive(message_t *msg, void* payload, uint8_t len) {
 	RandomBeaconMsg* cm = (RandomBeaconMsg*)payload;
-	call Leds.set(cm->seqno);
 	return msg;
 }
 

@@ -38,7 +38,7 @@
 generic configuration BlinkC(process_t process) {
 provides interface SplitControl;
 
-uses interface BlinkParams;
+uses interface Param;
 
 uses interface AMSend as SubAMSend;
 uses interface Receive as SubReceive;
@@ -50,13 +50,14 @@ uses interface PacketAcknowledgements as SubPacketAcknowledgements;
 uses interface PacketField<uint8_t> as SubPacketLinkQuality;
 uses interface PacketField<uint8_t> as SubPacketTransmitPower;
 uses interface PacketField<uint8_t> as SubPacketRSSI;
+uses interface PacketField<uint8_t> as SubPacketTimeSyncOffset;
 }
 
 implementation {
 components new BlinkP(process);
 SplitControl = BlinkP;
 
-BlinkParams = BlinkP;
+Param = BlinkP;
 
 SubAMSend = BlinkP.SubAMSend;
 SubReceive = BlinkP.SubReceive;
@@ -68,10 +69,14 @@ SubPacketAcknowledgements = BlinkP.SubPacketAcknowledgements;
 SubPacketLinkQuality = BlinkP.SubPacketLinkQuality;
 SubPacketTransmitPower = BlinkP.SubPacketTransmitPower;
 SubPacketRSSI = BlinkP.SubPacketRSSI;
+SubPacketTimeSyncOffset = BlinkP.SubPacketTimeSyncOffset;
 
 components LedsC;
 BlinkP.Leds -> LedsC;
 
 components new TimerMilliC() as Timer;
 BlinkP.Timer -> Timer;
+
+components SerialDbgsC;
+BlinkP.SerialDbgs -> SerialDbgsC.SerialDbgs[process];
 }

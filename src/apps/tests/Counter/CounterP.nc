@@ -39,7 +39,7 @@
 generic module CounterP(process_t process) {
 provides interface SplitControl;
 
-uses interface CounterParams;
+uses interface Param;
 
 uses interface AMSend as SubAMSend;
 uses interface Receive as SubReceive;
@@ -51,47 +51,65 @@ uses interface PacketAcknowledgements as SubPacketAcknowledgements;
 uses interface PacketField<uint8_t> as SubPacketLinkQuality;
 uses interface PacketField<uint8_t> as SubPacketTransmitPower;
 uses interface PacketField<uint8_t> as SubPacketRSSI;
+uses interface PacketField<uint8_t> as SubPacketTimeSyncOffset;
 
 uses interface Leds;
 uses interface Timer<TMilli>;
 
 uses interface SerialDbgs;
-
 }
 
 implementation {
 
-/**
- Available Parameters:
-	uint16_t delay,
-	uint16_t delay_scale,
-	uint16_t src,
-	uint16_t dest
-*/
-
+uint16_t delay;
+uint16_t delay_scale;
+uint16_t src;
+uint16_t dest;
+uint8_t repeat;
 
 message_t packet;
-uint16_t seqno;
+uint16_t seqno = 0;
 
 command error_t SplitControl.start() {
-	uint32_t send_delay = call CounterParams.get_delay() * 
-		call CounterParams.get_delay_scale();
+	uint32_t send_delay;
 
-	seqno = 0;
+	call Param.get(SRC, &src, sizeof(src));
+	call Param.get(DELAY, &delay, sizeof(delay));
+	call Param.get(DELAY_SCALE, &delay_scale, sizeof(delay_scale));
+	call Param.get(REPEAT, &repeat, sizeof(repeat));
 
-	if ((call CounterParams.get_src() == BROADCAST) || 
-	(call CounterParams.get_src() == TOS_NODE_ID)) {
-		call Timer.startPeriodic(send_delay);
+	send_delay = delay;
+	send_delay *= delay_scale;
+
+	if ((src == BROADCAST) || (src == TOS_NODE_ID)) {
+		if (repeat) {
+			call Timer.startPeriodic(send_delay);
+		} else {
+			call Timer.startOneShot(send_delay);
+		}
 	}
 
-	call SerialDbgs.dbgs(DBGS_MGMT_START, process, 0, 0);
+#ifdef __DBGS__APPLICATION__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[%u] Application Counter start()\n", process);
+#else
+	//call SerialDbgs.dbgs(DBGS_MGMT_START, process, 0, 0);
+#endif
+#endif
 	signal SplitControl.startDone(SUCCESS);
 	return SUCCESS;
 }
 
 command error_t SplitControl.stop() {
 	call Timer.stop();
-	call SerialDbgs.dbgs(DBGS_MGMT_STOP, process, 0, 0);
+
+#ifdef __DBGS__APPLICATION__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[%u] Application Counter stop()\n", process);
+#else
+	//call SerialDbgs.dbgs(DBGS_MGMT_STOP, process, 0, 0);
+#endif
+#endif
 	signal SplitControl.stopDone(SUCCESS);
 	return SUCCESS;
 }
@@ -107,8 +125,11 @@ task void sendMessage() {
 	msg->source = TOS_NODE_ID;
 	msg->seqno = seqno;
 
-	e = call SubAMSend.send(call CounterParams.get_dest(), &packet, 
-					sizeof(CounterMsg));
+	call Param.get(DEST, &dest, sizeof(dest));
+	e = call SubAMSend.send(dest, &packet, sizeof(CounterMsg));
+#ifdef __FLOCKLAB_LEDS__
+      call Leds.led0On();
+#endif
 	if (e != SUCCESS) {
 		signal SubAMSend.sendDone(&packet, e);
 	}
@@ -120,21 +141,48 @@ event void Timer.fired() {
 }
 
 event void SubAMSend.sendDone(message_t *msg, error_t error) {
+#ifdef __USUAL_LEDS__
 	call Leds.set(seqno);
-	call SerialDbgs.dbgs(DBGS_SEND_DATA, error, seqno, 
-				call CounterParams.get_dest());
+#endif
+#ifdef __DBGS__APPLICATION__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[%u] Application Counter SendDone Error: %d  Seqno: %d  Dest: %d\n", process, error, seqno, dest);
+#else
+	//call Param.get(DEST, &dest, sizeof(dest));
+	call SerialDbgs.dbgs(DBGS_SEND_DATA, error, seqno, dest);
+#endif
+#endif
+
+#ifdef __FLOCKLAB_LEDS__
+	call Leds.led0Off();
+#endif
 }
 
 
 event message_t* SubReceive.receive(message_t *msg, void* payload, uint8_t len) {
 	CounterMsg* cm = (CounterMsg*)payload;
+#ifdef __USUAL_LEDS__
 	call Leds.set(cm->seqno);
+#endif
+
+#ifdef __DBGS__APPLICATION__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[%u] Application Counter Receive Len: %d  Seqno: %d  Source: %d\n", process, len, cm->seqno, cm->source);
+#else
 	call SerialDbgs.dbgs(DBGS_RECEIVE_DATA, len, cm->seqno, cm->source);
+#endif
+#endif
+	call Param.set(RECEIVE_EVENT, &(cm->source), sizeof(cm->source));
+
 	return msg;
 }
 
 event message_t* SubSnoop.receive(message_t *msg, void* payload, uint8_t len) {
 	return msg;
+}
+
+event void Param.updated(uint8_t var_id, bool conflict) {
+
 }
 
 }

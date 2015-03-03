@@ -43,7 +43,7 @@ provides interface Packet;
 provides interface PacketAcknowledgements;
 provides interface LinkPacketMetadata;
 
-uses interface rf230Params;
+uses interface Param;
 uses interface StdControl as AMQueueControl;
 
 provides interface PacketField<uint8_t> as PacketLinkQuality;
@@ -66,15 +66,12 @@ components rf230P;
 components RF230ActiveMessageC as AM;
 components RF230RadioP as RadioP;
 
-rf230Params = rf230P;
-rf230Params = RadioP.rf230Params;
+Param = rf230P;
 SplitControl = rf230P.SplitControl;
 AMQueueControl = rf230P.AMQueueControl;
 AMSend = rf230P.AMSend;
 Receive = rf230P.Receive;
 Snoop = rf230P.Snoop;
-
-rf230P.RadioParamsControl -> RadioP.StdControl;
 
 rf230P.SubSplitControl -> AM.SplitControl;
 rf230P.PacketTransmitPower -> AM.PacketTransmitPower;

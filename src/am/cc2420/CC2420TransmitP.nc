@@ -81,7 +81,6 @@ module CC2420TransmitP @safe() {
   uses interface CC2420Ram as TXNONCE;
 
   uses interface CC2420Receive;
-  uses interface Leds;
 
 uses interface SerialDbgs;
 }
@@ -157,13 +156,17 @@ implementation {
   error_t releaseSpiResource();
   void signalDone( error_t err );
  
+#ifdef __DBGS__MAC_CONGESTION__
   task void reportCongestion() {
     call SerialDbgs.dbgs(DBGS_CONGESTION, 242, 0, 0);
   }
+#endif
 
+#ifdef __DBGS__MAC_NOT_ACKED__
   task void notAcked() {
     call SerialDbgs.dbgs(DBGS_NOT_ACKED, 242, 0, 0);
   }
+#endif
 
   /***************** Init Commands *****************/
   command error_t Init.init() {
@@ -528,7 +531,9 @@ implementation {
         break;
         
       case S_ACK_WAIT:
+#ifdef __DBGS__MAC_NOT_ACKED__
         post notAcked();
+#endif
         signalDone( SUCCESS );
         break;
 
@@ -614,7 +619,6 @@ implementation {
 #ifdef CC2420_HW_SECURITY
 
   task void waitTask(){
-    call Leds.led2Toggle();
     if(SECURITYLOCK == 1){
       post waitTask();
     }else{
@@ -668,7 +672,6 @@ implementation {
 	mode = CC2420_NO_SEC;
 	micLength = 4;
       }else if (secHdr->secLevel == CBC_MAC_4){
-	//	call Leds.led0Toggle();
 	mode = CC2420_CBC_MAC;
 	micLength = 4;
       }else if (secHdr->secLevel == CBC_MAC_8){
@@ -678,7 +681,6 @@ implementation {
 	mode = CC2420_CBC_MAC;
 	micLength = 16;
       }else if (secHdr->secLevel == CTR){
-	//	call Leds.led1Toggle();
 	mode = CC2420_CTR;
 	micLength = 4;
       }else if (secHdr->secLevel == CCM_4){
@@ -801,7 +803,9 @@ implementation {
       signal RadioBackoff.requestCongestionBackoff(m_msg);
       call BackoffTimer.start(myCongestionBackoff);
     }
+#ifdef __DBGS__MAC_CONGESTION__
     post reportCongestion();
+#endif
   }
   
   error_t acquireSpiResource() {

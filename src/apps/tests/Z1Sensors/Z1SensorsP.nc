@@ -38,7 +38,7 @@
 generic module Z1SensorsP(process_t process) {
 provides interface SplitControl;
 
-uses interface Z1SensorsParams;
+uses interface Param;
 
 uses interface AMSend as SubAMSend;
 uses interface Receive as SubReceive;
@@ -103,20 +103,16 @@ message_t serial_packet;
 uint16_t dest;
 
 task void report_measurements() {
-	call Leds.led1Toggle();
 
 	if (call SubAMSend.send(dest, &network_packet,
 			sizeof(z1_sensors_t)) != SUCCESS) {
-		call Leds.led0On();
 		signal SubAMSend.sendDone(&network_packet, FAIL);
 	}
 }
 
 task void send_serial_message() {
-	call Leds.led2Toggle();
 	if (call SerialAMSend.send(BROADCAST, &serial_packet, sizeof(z1_sensors_t)) != SUCCESS) {
 		signal SerialAMSend.sendDone(&serial_packet, FAIL);
-		call Leds.led0On();
 	}
 }
 
@@ -134,8 +130,9 @@ command error_t SplitControl.start() {
 
 	serial_data = (void*) call SerialAMSend.getPayload(&serial_packet,
                                                         sizeof(z1_sensors_t));
-	if (call Z1SensorsParams.get_dest()) {
-		dest = call Z1SensorsParams.get_dest();
+
+	call Param.get(DEST, &dest, sizeof(dest));
+	if (dest) {
 	} else {
 		dest = TOS_NODE_ID;
 	}

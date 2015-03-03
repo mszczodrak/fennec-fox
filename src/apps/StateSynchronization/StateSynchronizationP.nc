@@ -39,7 +39,7 @@
 generic module StateSynchronizationP(process_t process) @safe() {
 provides interface SplitControl;
 
-uses interface StateSynchronizationParams;
+uses interface Param;
 uses interface AMSend as SubAMSend;
 uses interface Receive as SubReceive;
 uses interface Receive as SubSnoop;
@@ -50,25 +50,29 @@ uses interface PacketAcknowledgements as SubPacketAcknowledgements;
 uses interface PacketField<uint8_t> as SubPacketLinkQuality;
 uses interface PacketField<uint8_t> as SubPacketTransmitPower;
 uses interface PacketField<uint8_t> as SubPacketRSSI;
+uses interface PacketField<uint8_t> as SubPacketTimeSyncOffset;
 
 uses interface FennecState;
 uses interface Random;
+
+uses interface SerialDbgs;
+
 uses interface Timer<TMilli> as Timer;
 uses interface Leds;
 }
 
 implementation {
 
+uint16_t send_delay;
 message_t packet;
 
 task void schedule_send() {
-	call Timer.startOneShot((call Random.rand16() % 
-		call StateSynchronizationParams.get_send_delay()) + 1);
+	call Param.get(SEND_DELAY, &send_delay, sizeof(send_delay));
+	call Timer.startOneShot((call Random.rand16() % send_delay) + 1);
 }
 
 task void send_msg() {
 	nx_struct fennec_network_state *state_msg;
-	dbg("StateSynchronization", "[%d] StateSynchronizationP send_state_sync_msg()", process);
 
 	state_msg = (nx_struct fennec_network_state*) 
 	call SubAMSend.getPayload(&packet, sizeof(nx_struct fennec_network_state));
@@ -84,11 +88,21 @@ task void send_msg() {
 		sizeof(nx_struct fennec_network_state) - 
 		sizeof(((nx_struct fennec_network_state *)0)->crc));
 
+#ifdef __DBGS__APPLICATION__
+#ifdef __DBGS__STATE_SYNC__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+		printf("[%u] Application StateSynchronization send_msg() [%u %u %u]\n", process,
+		state_msg->seq, state_msg->state_id, state_msg->crc);
+#else
+
+#endif
+#endif
+#endif
+
 	if (call SubAMSend.send(BROADCAST, &packet, sizeof(nx_struct fennec_network_state)) != SUCCESS) {
-		dbg("StateSynchronization", "[%d] StateSynchronizationP send_state_sync_msg() - FAIL", process);
 		signal SubAMSend.sendDone(&packet, FAIL);
 	} else {
-		dbg("StateSynchronization", "[%d] StateSynchronizationP send_state_sync_msg() - SUCCESS", process);
+
 	}
 }
 
@@ -98,7 +112,18 @@ event void FennecState.resend() {
 
 command error_t SplitControl.start() {
 	dbg("StateSynchronization", "[%d] StateSynchronizationP SplitControl.start()", process);
-	post schedule_send();
+
+#ifdef __DBGS__APPLICATION__
+#ifdef __DBGS__STATE_SYNC__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[%u] Application StateSynchronization start()\n", process);
+#else
+	call SerialDbgs.dbgs(DBGS_MGMT_START, process, 0, 0);
+#endif
+#endif
+#endif
+	//post schedule_send();
+	post send_msg();
 	signal SplitControl.startDone(SUCCESS);
 	return SUCCESS;
 }
@@ -106,6 +131,16 @@ command error_t SplitControl.start() {
 command error_t SplitControl.stop() {
 	dbg("StateSynchronization", "[%d] StateSynchronizationP SplitControl.stop()", process);
 	call Timer.stop();
+
+#ifdef __DBGS__APPLICATION__
+#ifdef __DBGS__STATE_SYNC__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[%u] Application StateSynchronization stop()\n", process);
+#else
+	call SerialDbgs.dbgs(DBGS_MGMT_STOP, process, 0, 0);
+#endif
+#endif
+#endif
 	signal SplitControl.stopDone(SUCCESS);
 	return SUCCESS;
 }
@@ -117,14 +152,41 @@ event message_t* SubReceive.receive(message_t *msg, void* payload, uint8_t len) 
 
 	if (state_msg->crc != (nx_uint16_t) crc16(0, (uint8_t*) state_msg, 
 		len - sizeof(((nx_struct fennec_network_state *)0)->crc)) ) {
+
+#ifdef __DBGS__APPLICATION__
+#ifdef __DBGS__STATE_SYNC__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+		printf("[%u] Application StateSynchronization receive() - drop\n", process);
+#else
+#endif
+#endif
+#endif
 		return msg;
 	}
+
+#ifdef __DBGS__APPLICATION__
+#ifdef __DBGS__STATE_SYNC__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[%u] Application StateSynchronization receive()\n", process);
+#else
+#endif
+#endif
+#endif
 
 	call FennecState.setStateAndSeq(state_msg->state_id, state_msg->seq);
 	return msg;
 }
 
 event void SubAMSend.sendDone(message_t *msg, error_t error) {
+#ifdef __DBGS__APPLICATION__
+#ifdef __DBGS__STATE_SYNC__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[%u] Application StateSynchronization sendDone(%d)\n", process, error);
+#else
+//	call SerialDbgs.dbgs(DBGS_SEND_DATA, error, seqno, dest);
+#endif
+#endif
+#endif
 	call FennecState.resendDone(error);
 }
 
@@ -136,6 +198,10 @@ event message_t* SubSnoop.receive(message_t *msg, void* payload, uint8_t len) {
 	nx_struct fennec_network_state *state_msg = (nx_struct fennec_network_state*) payload;
 	call FennecState.setStateAndSeq(state_msg->state_id, state_msg->seq);
 	return msg;
+}
+
+event void Param.updated(uint8_t var_id, bool conflict) {
+
 }
 
 }

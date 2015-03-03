@@ -34,7 +34,7 @@
 generic configuration timerMilliC(process_t process) {
 provides interface SplitControl;
 
-uses interface timerMilliParams;
+uses interface Param;
 
 uses interface AMSend as SubAMSend;
 uses interface Receive as SubReceive;
@@ -46,6 +46,7 @@ uses interface PacketAcknowledgements as SubPacketAcknowledgements;
 uses interface PacketField<uint8_t> as SubPacketLinkQuality;
 uses interface PacketField<uint8_t> as SubPacketTransmitPower;
 uses interface PacketField<uint8_t> as SubPacketRSSI;
+uses interface PacketField<uint8_t> as SubPacketTimeSyncOffset;
 
 uses interface Event;
 }
@@ -54,7 +55,7 @@ implementation {
 components new timerMilliP(process);
 SplitControl = timerMilliP;
 
-timerMilliParams = timerMilliP;
+Param = timerMilliP;
 
 SubAMSend = timerMilliP.SubAMSend;
 SubReceive = timerMilliP.SubReceive;
@@ -66,9 +67,17 @@ SubPacketAcknowledgements = timerMilliP.SubPacketAcknowledgements;
 SubPacketLinkQuality = timerMilliP.SubPacketLinkQuality;
 SubPacketTransmitPower = timerMilliP.SubPacketTransmitPower;
 SubPacketRSSI = timerMilliP.SubPacketRSSI;
+SubPacketTimeSyncOffset = timerMilliP.SubPacketTimeSyncOffset;
 
 Event = timerMilliP;
 
 components new TimerMilliC();
 timerMilliP.Timer -> TimerMilliC;
+
+components SerialDbgsC;
+timerMilliP.SerialDbgs -> SerialDbgsC.SerialDbgs[process];
+
+components LocalTime32khzC;
+timerMilliP.LocalTime -> LocalTime32khzC;
+
 }

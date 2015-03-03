@@ -1,17 +1,20 @@
 COMPONENT=$(FENNEC_FOX_LIB)/Fennec/FennecC
+TINYOS_ROOT_DIR?=/home/msz/github/tinyos
+
 SFC_GEN=$(FENNEC_FOX_LIB)/Fennec/sfc
 PFLAGS+=-DTOSH_DATA_LENGTH=127
 
 CFLAGS += -DLOW_POWER_LISTENING
 
-include $(FENNEC_FOX_LIB)/support/make/Makerules
-include $(MAKERULES)
-#include $(FENNEC_FOX_LIB)/support/make/tinyos.extra
+PFLAGS+=-D__USUAL_LEDS__
 
-#PFLAGS+=-D__DBGS__
+include $(FENNEC_FOX_LIB)/support/make/Makerules
+#include $(FENNEC_FOX_LIB)/support/make/flocklab.extra
+#include $(FENNEC_FOX_LIB)/support/make/dbgs.extra
+include $(TINYOS_ROOT_DIR)/Makefile.include
 
 # 2. TinyOS printf
-#CFLAGS += -I$(TOSDIR)/lib/printf
+#CFLAGS += -I$(TINYOS_OS_DIR)/lib/printf
 #CFLAGS += -DPRINTF_BUFFER_SIZE=200
 #CFLAGS += -DFENNEC_TOS_PRINTF
 #CFLAGS += -DFENNEC_COOJA_PRINTF

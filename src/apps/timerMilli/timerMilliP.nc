@@ -38,7 +38,7 @@
 generic module timerMilliP(process_t process) {
 provides interface SplitControl;
 
-uses interface timerMilliParams;
+uses interface Param;
 
 uses interface AMSend as SubAMSend;
 uses interface Receive as SubReceive;
@@ -50,29 +50,43 @@ uses interface PacketAcknowledgements as SubPacketAcknowledgements;
 uses interface PacketField<uint8_t> as SubPacketLinkQuality;
 uses interface PacketField<uint8_t> as SubPacketTransmitPower;
 uses interface PacketField<uint8_t> as SubPacketRSSI;
+uses interface PacketField<uint8_t> as SubPacketTimeSyncOffset;
 
 uses interface Event;
 uses interface Timer<TMilli>;
+uses interface LocalTime<T32khz>;
+
+uses interface SerialDbgs;
 }
 
 implementation {
 
-/** Available Parameters
-	uint32_t delay = 1000,
-	uint16_t src = 0
-*/
-
+uint32_t delay;
+uint16_t src;
+uint32_t start_32khz;
 
 command error_t SplitControl.start() {
-	dbg("Application", "[%d] timerMilli SplitControl.start()", process);
-	dbg("Application", "[%d] timerMilli src: %d", process, call timerMilliParams.get_src());
+	//uint32_t now = call LocalTime.get();
+	call Param.get(DELAY, &delay, sizeof(delay));
+	call Param.get(SRC, &src, sizeof(src));
+	call Param.get(START_32KHZ, &start_32khz, sizeof(start_32khz));
 
-	if ((call timerMilliParams.get_src() == BROADCAST) || 
-		(call timerMilliParams.get_src() == TOS_NODE_ID)) {
-		dbg("Application", "[%d] timerMilli will fire in %d ms",
-			process, call timerMilliParams.get_delay());
-		call Timer.startOneShot(call timerMilliParams.get_delay());
+#ifdef __DBGS__EVENT__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+	printf("[%u] Event timerMilli start() - %lu %lu\n", process, delay, start_32khz);
+#else
+	//call SerialDbgs.dbgs(DBGS_MGMT_START, process, 0, 0);
+#endif
+#endif
 
+	if ((src == BROADCAST) || (src == TOS_NODE_ID)) {
+		if (start_32khz == 0) {
+			/* do not calibrate if offset is unknown */
+			call Timer.startOneShot(delay);
+		} else {
+			call Timer.startOneShotAt(_32KHZ_2_MILLI(start_32khz), delay);
+			start_32khz += _MILLI_2_32KHZ(delay);
+		}
 	}
 	signal SplitControl.startDone(SUCCESS);
 	return SUCCESS;
@@ -80,14 +94,30 @@ command error_t SplitControl.start() {
 
 command error_t SplitControl.stop() {
 	call Timer.stop();
-	dbg("Application", "[%d] timerMilli SplitControl.stop()", process);
+
+#ifdef __DBGS__EVENT__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+        printf("[%u] Event timerMilli stop()\n", process);
+#else
+	//call SerialDbgs.dbgs(DBGS_MGMT_STOP, process, 0, 0);
+#endif
+#endif
+
 	signal SplitControl.stopDone(SUCCESS);
 	return SUCCESS;
 }
 
 
 event void Timer.fired() {
-	dbg("Application", "[%d] timerMilli call Event.report(%d, TRUE)", process, process);
+	call Param.set(START_32KHZ, &start_32khz, sizeof(start_32khz));
+#ifdef __DBGS__EVENT__
+#if defined(FENNEC_TOS_PRINTF) || defined(FENNEC_COOJA_PRINTF)
+        printf("[%u] Event timerMilli fired()\n", process);
+#else
+	call SerialDbgs.dbgs(DBGS_TIMER_FIRED, src, (uint16_t)(delay >> 16), (uint16_t)delay);
+#endif
+#endif
+
 	call Event.report(process, TRUE);
 }
 
@@ -99,6 +129,10 @@ event message_t* SubReceive.receive(message_t *msg, void* payload, uint8_t len) 
 
 event message_t* SubSnoop.receive(message_t *msg, void* payload, uint8_t len) {
 	return msg;
+}
+
+event void Param.updated(uint8_t var_id, bool conflict) {
+
 }
 
 }
