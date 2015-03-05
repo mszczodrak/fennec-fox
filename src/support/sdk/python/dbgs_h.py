@@ -59,6 +59,8 @@ DBGS_ACKED                              = 53
 DBGS_CONGESTION				= 54
 DBGS_UPDATE_LOCAL_DATA			= 55
 DBGS_UPDATE_NETWORK_DATA		= 56
+DBGS_CONFLICT				= 57
+DBGS_SEQUENCE_INCREASE			= 58
 
 DBGS_STATUS_UPDATE			= 60
 
@@ -252,6 +254,12 @@ def dbg_translate(dbg_num):
 
 	if dbg_num == DBGS_UPDATE_NETWORK_DATA:
 		return "Network Data Update"
+
+	if dbg_num == DBGS_CONFLICT:
+		return "Conflict"
+
+	if dbg_num == DBGS_SEQUENCE_INCREASE:
+		return "Sequence Increase"
 
 	if dbg_num == DBGS_STATUS_UPDATE:
 		return "Status Update"

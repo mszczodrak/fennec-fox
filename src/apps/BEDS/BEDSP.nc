@@ -58,6 +58,9 @@ uses interface FennecData;
 uses interface Random; 
 uses interface Timer<TMilli> as Timer;
 uses interface Leds;
+
+uses interface SerialDbgs;
+
 }
 
 implementation {
@@ -142,6 +145,11 @@ task void process_receive() {
 				if (var_hist[i] == in_data_msg->var_hist[i]) {
 					/* conflict: same sequence but different data */
 					var_hist[i] += (call Random.rand16() % BEDS_RANDOM_INCREASE);
+
+#ifdef __DBGS__APPLICATION__
+					call SerialDbgs.dbgs(DBGS_SEQUENCE_INCREASE, process, i, var_hist[i]);
+#endif
+
 					if (((var_hist[i] > data_sequence) && (var_hist[i] - data_sequence) < BEDS_WRAPPER) ||
 							/* wrap around */ 
 						((data_sequence > var_hist[i]) && ((data_sequence - var_hist[i]) > BEDS_WRAPPER))) {

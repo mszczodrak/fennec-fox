@@ -83,5 +83,7 @@ BEDSP.Leds -> LedsC;
 components new TimerMilliC() as Timer;
 BEDSP.Timer -> Timer;
 
+components SerialDbgsC;
+BEDSP.SerialDbgs -> SerialDbgsC.SerialDbgs[process];
 }
 
